@@ -2,10 +2,10 @@ import { isAgentEventType, type AgentEvent } from "./agentStatus";
 
 export type BridgeHelloMessage = {
   kind: "bridge.hello";
-  source: "mock-bridge";
+  source: string;
   version: 1;
   at: number;
-  intervalMs: number;
+  intervalMs?: number;
 };
 
 export type AgentEventMessage = {
@@ -22,10 +22,10 @@ export function isStatusMessage(value: unknown): value is StatusMessage {
 
   if (value.kind === "bridge.hello") {
     return (
-      value.source === "mock-bridge" &&
+      typeof value.source === "string" &&
       value.version === 1 &&
       typeof value.at === "number" &&
-      typeof value.intervalMs === "number"
+      (value.intervalMs === undefined || typeof value.intervalMs === "number")
     );
   }
 
@@ -56,3 +56,4 @@ function isAgentEvent(value: unknown): value is AgentEvent {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
+
