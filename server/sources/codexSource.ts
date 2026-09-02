@@ -1,13 +1,16 @@
 import type {
-  EmitStatusMessage,
+  PublishStatusMessage,
   StatusSource,
-  StatusSourceContext,
+  StatusSourceBridgeRuntime,
 } from "./statusSource";
 
 export function createCodexSource(): StatusSource {
   return {
     name: "codex-bridge",
-    start(_emit: EmitStatusMessage, _context: StatusSourceContext) {
+    startPublishing(
+      _publish: PublishStatusMessage,
+      _bridgeRuntime: StatusSourceBridgeRuntime,
+    ) {
       throw new Error("codexSource is not implemented yet");
     },
     stop() {},

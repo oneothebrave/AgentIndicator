@@ -41,7 +41,7 @@ Codex / CLI / other agent
 
 当前 mock bridge 已提供：
 
-- `npm run bridge:mock` 启动本地 WebSocket 服务。
+- `npm run bridge:mock` 通过 `server/index.ts` 启动本地 WebSocket 服务。
 - `ws://127.0.0.1:8787/status` 推送 `bridge.hello` 和 `agent.event`。
 - `http://127.0.0.1:8787/health` 返回服务健康状态。
 - 浏览器前端固定连接 bridge，不提供 URL 输入框或启停开关。
@@ -80,3 +80,4 @@ Codex / CLI / other agent
 ## 当前完成范围
 
 本次先完成阶段 1，不接真实 Codex，也不写 ESP32 固件。这样能先把产品形态、状态命名和动画节奏定下来。
+

@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import { demoTimeline } from "../../src/data/demoTimeline";
 import type { AgentEvent } from "../../src/domain/agentStatus";
 import type {
-  EmitStatusMessage,
+  PublishStatusMessage,
   StatusSource,
-  StatusSourceContext,
+  StatusSourceBridgeRuntime,
 } from "./statusSource";
 
 export type MockSourceOptions = {
@@ -21,13 +21,16 @@ export function createMockSource({
 
   return {
     name: "mock-bridge",
-    start(emit: EmitStatusMessage, context: StatusSourceContext) {
+    startPublishing(
+      publish: PublishStatusMessage,
+      bridgeRuntime: StatusSourceBridgeRuntime,
+    ) {
       if (ticker) {
         return;
       }
 
       ticker = setInterval(() => {
-        if (skipWhenNoClients && context.getClientCount() === 0) {
+        if (skipWhenNoClients && bridgeRuntime.getClientCount() === 0) {
           return;
         }
 
@@ -42,7 +45,7 @@ export function createMockSource({
         };
 
         sequence += 1;
-        emit({ kind: "agent.event", event });
+        publish({ kind: "agent.event", event });
       }, intervalMs);
     },
     stop() {

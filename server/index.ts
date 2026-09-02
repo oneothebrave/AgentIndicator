@@ -1,37 +1,66 @@
-import { createStatusBroadcaster } from "./statusBroadcaster";
+import {
+  createBridgeServer,
+  type BridgeServer,
+} from "./statusBroadcaster";
+import { createCodexSource } from "./sources/codexSource";
+import { createMockSource } from "./sources/mockSource";
 import type { StatusSource } from "./sources/statusSource";
 
-export type BridgeRuntimeConfig = {
+type BridgeRuntimeConfig = {
   host: string;
   port: number;
   statusPath: string;
   sourceIntervalMs?: number;
 };
 
-export function runBridge(source: StatusSource, config: BridgeRuntimeConfig) {
-  const broadcaster = createStatusBroadcaster({
+const host = process.env.AGENT_INDICATOR_HOST ?? "127.0.0.1";
+const port = Number(process.env.AGENT_INDICATOR_PORT ?? 8787);
+const statusPath = "/status";
+const intervalMs = Number(process.env.AGENT_INDICATOR_INTERVAL_MS ?? 1600);
+const sourceName = process.env.AGENT_INDICATOR_SOURCE ?? "mock";
+
+const statusSource = createStatusSource(sourceName);
+
+startBridge(statusSource, {
+  host,
+  port,
+  statusPath,
+  sourceIntervalMs: sourceName === "mock" ? intervalMs : undefined,
+});
+
+function createStatusSource(name: string): StatusSource {
+  if (name === "mock") {
+    return createMockSource({ intervalMs });
+  }
+
+  if (name === "codex") {
+    return createCodexSource();
+  }
+
+  throw new Error(`Unsupported AGENT_INDICATOR_SOURCE: ${name}`);
+}
+
+function startBridge(statusSource: StatusSource, config: BridgeRuntimeConfig) {
+  const bridgeServer = createBridgeServer({
     ...config,
-    bridgeSource: source.name,
+    bridgeSource: statusSource.name,
   });
 
-  source.start(broadcaster.broadcast, {
-    getClientCount: broadcaster.getClientCount,
+  bridgeServer.listen(() => {
+    statusSource.startPublishing(bridgeServer.broadcast, {
+      getClientCount: bridgeServer.getClientCount,
+    });
   });
-  broadcaster.listen();
 
+  registerShutdown(statusSource, bridgeServer);
+}
+
+function registerShutdown(statusSource: StatusSource, bridgeServer: BridgeServer) {
   function shutdown() {
-    source.stop();
-    broadcaster.close(() => process.exit(0));
+    statusSource.stop();
+    bridgeServer.close(() => process.exit(0));
   }
 
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
-
-  return {
-    stop() {
-      source.stop();
-      broadcaster.close();
-    },
-  };
 }
-

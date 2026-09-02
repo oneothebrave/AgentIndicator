@@ -5,7 +5,7 @@ import type {
   StatusMessage,
 } from "../src/domain/statusProtocol";
 
-export type StatusBroadcasterConfig = {
+export type BridgeServerConfig = {
   host: string;
   port: number;
   statusPath: string;
@@ -13,16 +13,14 @@ export type StatusBroadcasterConfig = {
   sourceIntervalMs?: number;
 };
 
-export type StatusBroadcaster = {
+export type BridgeServer = {
   broadcast: (message: StatusMessage) => void;
   close: (onClosed?: () => void) => void;
   getClientCount: () => number;
-  listen: () => void;
+  listen: (onListening?: () => void) => void;
 };
 
-export function createStatusBroadcaster(
-  config: StatusBroadcasterConfig,
-): StatusBroadcaster {
+export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
   const clients = new Set<WebSocket>();
   const server = createHealthServer(config, clients);
   const wss = new WebSocketServer({ server, path: config.statusPath });
@@ -58,7 +56,7 @@ export function createStatusBroadcaster(
     getClientCount() {
       return clients.size;
     },
-    listen() {
+    listen(onListening) {
       server.listen(config.port, config.host, () => {
         console.log(
           `[bridge] status stream ws://${config.host}:${config.port}${config.statusPath}`,
@@ -66,13 +64,14 @@ export function createStatusBroadcaster(
         console.log(
           `[bridge] health check http://${config.host}:${config.port}/health`,
         );
+        onListening?.();
       });
     },
   };
 }
 
 function createHealthServer(
-  config: StatusBroadcasterConfig,
+  config: BridgeServerConfig,
   clients: Set<WebSocket>,
 ): Server {
   return createServer((request, response) => {
@@ -94,9 +93,7 @@ function createHealthServer(
   });
 }
 
-function createHelloMessage(
-  config: StatusBroadcasterConfig,
-): BridgeHelloMessage {
+function createHelloMessage(config: BridgeServerConfig): BridgeHelloMessage {
   return {
     kind: "bridge.hello",
     source: config.bridgeSource,
