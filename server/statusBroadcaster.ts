@@ -1,7 +1,9 @@
 import { createServer, type Server } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 import {
-  bridgeHelloMessage,
+  AGENT_EVENT_KIND,
+  createBridgeHelloMessage,
+  type AgentEventMessage,
   type StatusMessage,
 } from "../src/domain/statusProtocol";
 
@@ -18,22 +20,29 @@ export type BridgeServer = {
   close: (onClosed?: () => void) => void;
   getClientCount: () => number;
   listen: (onListening?: () => void) => void;
+  waitForClient: () => Promise<void>;
 };
 
 export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
   const clients = new Set<WebSocket>();
-  const server = createHealthServer(config, clients);
+  const clientWaiters = new Set<() => void>();
+  let latestAgentEventMessage: AgentEventMessage | undefined;
+  const server = createHealthServer(config, clients, () => latestAgentEventMessage);
   const wss = new WebSocketServer({ server, path: config.statusPath });
 
   wss.on("connection", (client) => {
     clients.add(client);
+    resolveClientWaiters(clientWaiters);
     send(
       client,
-      bridgeHelloMessage({
+      createBridgeHelloMessage({
         source: config.bridgeSource,
         intervalMs: config.sourceIntervalMs,
       }),
     );
+    if (latestAgentEventMessage) {
+      send(client, latestAgentEventMessage);
+    }
 
     client.on("close", () => {
       clients.delete(client);
@@ -42,6 +51,10 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
 
   return {
     broadcast(message) {
+      if (message.kind === AGENT_EVENT_KIND) {
+        latestAgentEventMessage = message;
+      }
+
       const encoded = JSON.stringify(message);
 
       for (const client of clients) {
@@ -62,6 +75,15 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
     getClientCount() {
       return clients.size;
     },
+    waitForClient() {
+      if (clients.size > 0) {
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        clientWaiters.add(resolve);
+      });
+    },
     listen(onListening) {
       server.listen(config.port, config.host, () => {
         console.log(
@@ -79,9 +101,12 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
 function createHealthServer(
   config: BridgeServerConfig,
   clients: Set<WebSocket>,
+  getLatestAgentEventMessage: () => AgentEventMessage | undefined,
 ): Server {
   return createServer((request, response) => {
     if (request.url === "/health") {
+      const latestAgentEventMessage = getLatestAgentEventMessage();
+
       response.writeHead(200, { "content-type": "application/json" });
       response.end(
         JSON.stringify({
@@ -89,6 +114,7 @@ function createHealthServer(
           service: "agent-indicator-bridge",
           source: config.bridgeSource,
           clients: clients.size,
+          latestAgentEvent: latestAgentEventMessage?.event,
         }),
       );
       return;
@@ -103,4 +129,12 @@ function send(client: WebSocket, message: StatusMessage) {
   if (client.readyState === WebSocket.OPEN) {
     client.send(JSON.stringify(message));
   }
+}
+
+function resolveClientWaiters(clientWaiters: Set<() => void>) {
+  for (const resolve of clientWaiters) {
+    resolve();
+  }
+
+  clientWaiters.clear();
 }

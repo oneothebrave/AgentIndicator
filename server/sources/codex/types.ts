@@ -32,12 +32,18 @@ export type CodexTurnConfig = {
   threadId?: string;
   approvalPolicy: CodexApprovalPolicy;
   sandbox: CodexSandboxMode;
+  waitForClient: boolean;
+};
+
+export type CodexEventConfig = {
+  messageDeltaThrottleMs: number;
 };
 
 export type CodexSourceConfig = {
   launch: CodexAppServerLaunchConfig;
   client: JsonRpcClientConfig;
   turn: CodexTurnConfig;
+  events: CodexEventConfig;
 };
 
 export type CodexThreadStartResult = {

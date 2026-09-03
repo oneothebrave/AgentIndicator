@@ -1,6 +1,6 @@
-import type { JsonRpcRequestOrNotification } from "./jsonRpc";
+import type { JsonRpcServerRequest } from "./jsonRpc";
 
-export function resolveServerRequest(request: JsonRpcRequestOrNotification) {
+export function resolveServerRequest(request: JsonRpcServerRequest) {
   switch (request.method) {
     case "currentTime/read":
       return {
@@ -22,16 +22,6 @@ export function resolveServerRequest(request: JsonRpcRequestOrNotification) {
         action: "decline",
         content: null,
         _meta: null,
-      };
-    case "applyPatchApproval":
-    case "execCommandApproval":
-      return {
-        decision: {
-          denied: {
-            rejection:
-              "Agent Indicator bridge does not implement approval UI yet.",
-          },
-        },
       };
     default:
       throw new Error(

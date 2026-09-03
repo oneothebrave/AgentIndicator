@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { demoTimeline } from "../../src/data/demoTimeline";
 import {
-  agentEventMessage,
+  createAgentEventMessage,
   normalizeAgentEvent,
 } from "../../src/domain/statusProtocol";
 import type {
-  PublishStatusMessage,
   StatusSource,
   StatusSourceBridgeRuntime,
 } from "./statusSource";
@@ -24,10 +23,7 @@ export function createMockSource({
 
   return {
     name: "mock-bridge",
-    startPublishing(
-      publish: PublishStatusMessage,
-      bridgeRuntime: StatusSourceBridgeRuntime,
-    ) {
+    startPublishing(bridgeRuntime: StatusSourceBridgeRuntime) {
       if (ticker) {
         return;
       }
@@ -47,7 +43,7 @@ export function createMockSource({
         });
 
         sequence += 1;
-        publish(agentEventMessage(event));
+        bridgeRuntime.sendStatusMessage(createAgentEventMessage(event));
       }, intervalMs);
     },
     stop() {

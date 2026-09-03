@@ -2,9 +2,11 @@ import { CodexAppServerProcess } from "./appServerProcess";
 import {
   isJsonRpcRequestOrNotification,
   isJsonRpcResponse,
+  isJsonRpcServerRequest,
   parseJsonRpcMessage,
   type JsonRpcRequestOrNotification,
   type JsonRpcResponse,
+  type JsonRpcServerRequest,
 } from "./jsonRpc";
 import { PendingJsonRpcRequests } from "./pendingRequests";
 import type {
@@ -19,7 +21,7 @@ type CodexAppServerClientOptions = {
   client: JsonRpcClientConfig;
   onNotification: (notification: CodexNotification) => void;
   onServerRequest: (
-    request: JsonRpcRequestOrNotification,
+    request: JsonRpcServerRequest,
   ) => unknown | Promise<unknown>;
   onExit: (description: string) => void;
 };
@@ -28,7 +30,7 @@ export class CodexAppServerClient {
   private readonly clientConfig: JsonRpcClientConfig;
   private readonly onNotification: (notification: CodexNotification) => void;
   private readonly onServerRequest: (
-    request: JsonRpcRequestOrNotification,
+    request: JsonRpcServerRequest,
   ) => unknown | Promise<unknown>;
   private readonly onExit: (description: string) => void;
   private readonly appServerProcess: CodexAppServerProcess;
@@ -106,12 +108,12 @@ export class CodexAppServerClient {
       return;
     }
 
-    if (isJsonRpcRequestOrNotification(message)) {
-      if (message.id !== undefined) {
-        void this.handleServerRequest(message);
-        return;
-      }
+    if (isJsonRpcServerRequest(message)) {
+      void this.handleServerRequest(message);
+      return;
+    }
 
+    if (isJsonRpcRequestOrNotification(message)) {
       this.onNotification(message);
       return;
     }
@@ -123,7 +125,7 @@ export class CodexAppServerClient {
     this.pendingRequests.resolveResponse(response);
   }
 
-  private async handleServerRequest(request: JsonRpcRequestOrNotification) {
+  private async handleServerRequest(request: JsonRpcServerRequest) {
     let response: unknown;
 
     try {

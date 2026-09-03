@@ -1,21 +1,20 @@
 import { CodexAppServerClient } from "./codex/client";
 import { readCodexSourceConfigFromEnv } from "./codex/config";
-import {
-  publishAgentEvent,
-  publishNotificationFromCodex,
-} from "./codex/events";
+import { createCodexEventPublisher } from "./codex/events";
 import { resolveServerRequest } from "./codex/serverRequests";
 import { startCodexSession } from "./codex/session";
 import type { CodexSourceConfig } from "./codex/types";
 import { getErrorMessage } from "./codex/utils";
 import type {
-  PublishStatusMessage,
   StatusSource,
   StatusSourceBridgeRuntime,
 } from "./statusSource";
 
 export type { CodexNotification, CodexSourceConfig } from "./codex/types";
-export { mapCodexNotificationToAgentEvent } from "./codex/events";
+export {
+  mapCodexNotificationToAgentEvent,
+  mapCodexServerRequestToAgentEvent,
+} from "./codex/events";
 
 export function createCodexSource(
   config: CodexSourceConfig = readCodexSourceConfigFromEnv(),
@@ -25,23 +24,24 @@ export function createCodexSource(
 
   return {
     name: "codex-app-server",
-    startPublishing(
-      publish: PublishStatusMessage,
-      _bridgeRuntime: StatusSourceBridgeRuntime,
-    ) {
+    startPublishing(bridgeRuntime: StatusSourceBridgeRuntime) {
       if (client) {
         return;
       }
 
       stopping = false;
+      const codexEvents = createCodexEventPublisher({
+        config: config.events,
+        sendStatusMessage: bridgeRuntime.sendStatusMessage,
+      });
       client = new CodexAppServerClient({
         launch: config.launch,
         client: config.client,
         onNotification(notification) {
-          publishNotificationFromCodex(publish, notification);
+          codexEvents.publishNotificationFromCodex(notification);
         },
         onServerRequest(request) {
-          publishNotificationFromCodex(publish, request);
+          codexEvents.publishServerRequestFromCodex(request);
           return resolveServerRequest(request);
         },
         onExit(exitDescription) {
@@ -49,7 +49,7 @@ export function createCodexSource(
             return;
           }
 
-          publishAgentEvent(publish, {
+          codexEvents.publishAgentEvent({
             type: "turn.failed",
             label: "Error",
             detail: `codex app-server exited: ${exitDescription}`,
@@ -57,8 +57,8 @@ export function createCodexSource(
         },
       });
 
-      void startCodexSession(client, config.turn, publish).catch((error: unknown) => {
-        publishAgentEvent(publish, {
+      void startWhenReady(bridgeRuntime, client, config).catch((error: unknown) => {
+        codexEvents.publishAgentEvent({
           type: "turn.failed",
           label: "Error",
           detail: getErrorMessage(error, "Failed to start codex app-server"),
@@ -72,4 +72,19 @@ export function createCodexSource(
       client = undefined;
     },
   };
+}
+
+async function startWhenReady(
+  bridgeRuntime: StatusSourceBridgeRuntime,
+  client: CodexAppServerClient,
+  config: CodexSourceConfig,
+) {
+  if (config.turn.prompt?.trim() && config.turn.waitForClient) {
+    console.log(
+      "[codex-source] waiting for a WebSocket client before starting Codex turn",
+    );
+    await bridgeRuntime.waitForClient();
+  }
+
+  await startCodexSession(client, config.turn);
 }

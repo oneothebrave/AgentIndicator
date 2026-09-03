@@ -1,39 +1,74 @@
 import { randomUUID } from "node:crypto";
 import type { AgentEvent } from "../../../src/domain/agentStatus";
 import {
-  agentEventMessage,
+  createAgentEventMessage,
   normalizeAgentEvent,
 } from "../../../src/domain/statusProtocol";
-import type { PublishStatusMessage } from "../statusSource";
-import type { CodexAgentEventInput, CodexNotification } from "./types";
+import type { SendStatusMessage } from "../statusSource";
+import type { JsonRpcServerRequest } from "./jsonRpc";
+import type {
+  CodexAgentEventInput,
+  CodexEventConfig,
+  CodexNotification,
+} from "./types";
 import { getErrorMessage, getNestedString, getNestedValue } from "./utils";
 
 const CODEX_SOURCE_ORIGIN = "codex";
 
-export function publishNotificationFromCodex(
-  publish: PublishStatusMessage,
-  notification: CodexNotification,
-) {
-  const event = mapCodexNotificationToAgentEvent(notification);
+export type CodexEventPublisher = {
+  publishNotificationFromCodex: (notification: CodexNotification) => void;
+  publishServerRequestFromCodex: (request: JsonRpcServerRequest) => void;
+  publishAgentEvent: (input: CodexAgentEventInput) => void;
+};
 
-  if (event) {
-    publish(agentEventMessage(event));
-  }
+export function createCodexEventPublisher({
+  config,
+  sendStatusMessage,
+}: {
+  config: CodexEventConfig;
+  sendStatusMessage: SendStatusMessage;
+}): CodexEventPublisher {
+  let lastMessageDeltaSentAt = 0;
+
+  const sendAgentEvent = (event: AgentEvent | undefined) => {
+    if (!event) {
+      return;
+    }
+
+    if (event.type === "message.delta") {
+      const now = Date.now();
+
+      if (
+        isThrottled(now, lastMessageDeltaSentAt, config.messageDeltaThrottleMs)
+      ) {
+        return;
+      }
+
+      lastMessageDeltaSentAt = now;
+    }
+
+    sendStatusMessage(createAgentEventMessage(event));
+  };
+
+  return {
+    publishNotificationFromCodex(notification) {
+      sendAgentEvent(mapCodexNotificationToAgentEvent(notification));
+    },
+    publishServerRequestFromCodex(request) {
+      sendAgentEvent(mapCodexServerRequestToAgentEvent(request));
+    },
+    publishAgentEvent(input) {
+      sendStatusMessage(createAgentEventMessage(createCodexAgentEvent(input)));
+    },
+  };
 }
 
-export function publishAgentEvent(
-  publish: PublishStatusMessage,
-  input: CodexAgentEventInput,
-) {
-  publish(
-    agentEventMessage(
-      normalizeAgentEvent({
-        id: randomUUID(),
-        origin: CODEX_SOURCE_ORIGIN,
-        ...input,
-      }),
-    ),
-  );
+function isThrottled(
+  now: number,
+  lastSentAt: number,
+  throttleMs: number,
+): boolean {
+  return throttleMs > 0 && now - lastSentAt < throttleMs;
 }
 
 export function mapCodexNotificationToAgentEvent(
@@ -45,6 +80,22 @@ export function mapCodexNotificationToAgentEvent(
     return undefined;
   }
 
+  return createCodexAgentEvent(input);
+}
+
+export function mapCodexServerRequestToAgentEvent(
+  request: JsonRpcServerRequest,
+): AgentEvent | undefined {
+  const input = mapCodexServerRequestToInput(request);
+
+  if (!input) {
+    return undefined;
+  }
+
+  return createCodexAgentEvent(input);
+}
+
+function createCodexAgentEvent(input: CodexAgentEventInput): AgentEvent {
   return normalizeAgentEvent({
     id: randomUUID(),
     origin: CODEX_SOURCE_ORIGIN,
@@ -119,6 +170,15 @@ function mapCodexNotificationToInput(
         label: "Tool",
         detail: "Codex tool call is in progress",
       };
+    default:
+      return undefined;
+  }
+}
+
+function mapCodexServerRequestToInput(
+  request: JsonRpcServerRequest,
+): CodexAgentEventInput | undefined {
+  switch (request.method) {
     case "item/commandExecution/requestApproval":
     case "item/fileChange/requestApproval":
     case "item/permissions/requestApproval":
@@ -147,6 +207,14 @@ function mapThreadStatusChanged(
     };
   }
 
+  if (status === "idle") {
+    return {
+      type: "thread.idle",
+      label: "Idle",
+      detail: "Codex thread is idle",
+    };
+  }
+
   if (status === "systemError") {
     return {
       type: "turn.failed",
@@ -160,9 +228,8 @@ function mapThreadStatusChanged(
 
 function mapTurnCompleted(params: unknown): CodexAgentEventInput {
   const status = getNestedString(params, ["turn", "status", "type"]);
-  const legacyStatus = getNestedString(params, ["turn", "status"]);
 
-  if (status === "failed" || legacyStatus === "failed") {
+  if (status === "failed") {
     return {
       type: "turn.failed",
       label: "Error",
@@ -173,7 +240,7 @@ function mapTurnCompleted(params: unknown): CodexAgentEventInput {
     };
   }
 
-  if (status === "interrupted" || legacyStatus === "interrupted") {
+  if (status === "interrupted") {
     return {
       type: "turn.completed",
       label: "Interrupted",
@@ -188,8 +255,16 @@ function mapTurnCompleted(params: unknown): CodexAgentEventInput {
   };
 }
 
-function mapItemStarted(params: unknown): CodexAgentEventInput {
+function mapItemStarted(params: unknown): CodexAgentEventInput | undefined {
   const itemType = getItemType(params);
+
+  if (
+    itemType === "userMessage" ||
+    itemType === "systemMessage" ||
+    itemType === "developerMessage"
+  ) {
+    return undefined;
+  }
 
   if (itemType === "reasoning" || itemType === "plan") {
     return {
@@ -245,11 +320,7 @@ function mapItemStarted(params: unknown): CodexAgentEventInput {
     };
   }
 
-  return {
-    type: "tool.started",
-    label: "Tool",
-    detail: itemType ? `Codex started ${itemType}` : "Codex started an item",
-  };
+  return undefined;
 }
 
 function mapItemCompleted(params: unknown): CodexAgentEventInput | undefined {

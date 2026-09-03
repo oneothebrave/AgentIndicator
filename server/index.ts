@@ -49,8 +49,10 @@ function startBridge(statusSource: StatusSource, config: BridgeRuntimeConfig) {
   });
 
   bridgeServer.listen(() => {
-    statusSource.startPublishing(bridgeServer.broadcast, {
+    statusSource.startPublishing({
+      sendStatusMessage: bridgeServer.broadcast,
       getClientCount: bridgeServer.getClientCount,
+      waitForClient: bridgeServer.waitForClient,
     });
   });
 

@@ -32,7 +32,9 @@ export type AgentEventMessage = {
 
 export type StatusMessage = BridgeHelloMessage | AgentEventMessage;
 
-export function bridgeHelloMessage(input: BridgeHelloInput): BridgeHelloMessage {
+export function createBridgeHelloMessage(
+  input: BridgeHelloInput,
+): BridgeHelloMessage {
   return {
     kind: BRIDGE_HELLO_KIND,
     source: input.source,
@@ -53,7 +55,7 @@ export function normalizeAgentEvent(input: AgentEventInput): AgentEvent {
   };
 }
 
-export function agentEventMessage(event: AgentEvent): AgentEventMessage {
+export function createAgentEventMessage(event: AgentEvent): AgentEventMessage {
   return {
     kind: AGENT_EVENT_KIND,
     event,

@@ -18,6 +18,10 @@ export type JsonRpcRequestOrNotification = {
   params?: unknown;
 };
 
+export type JsonRpcServerRequest = JsonRpcRequestOrNotification & {
+  id: JsonRpcId;
+};
+
 export function parseJsonRpcMessage(line: string): unknown | undefined {
   try {
     return JSON.parse(line);
@@ -39,4 +43,10 @@ export function isJsonRpcRequestOrNotification(
   value: unknown,
 ): value is JsonRpcRequestOrNotification {
   return isRecord(value) && typeof value.method === "string";
+}
+
+export function isJsonRpcServerRequest(
+  value: unknown,
+): value is JsonRpcServerRequest {
+  return isJsonRpcRequestOrNotification(value) && value.id !== undefined;
 }

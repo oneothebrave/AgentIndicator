@@ -8,6 +8,7 @@
     "bridge": "tsx server/index.ts",
     "bridge:mock": "tsx server/index.ts",
     "bridge:codex": "tsx server/index.ts",
+    "test": "node --import tsx --test server/sources/codex/events.test.ts",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },

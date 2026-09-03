@@ -16,6 +16,7 @@ export type AgentEventOrigin = "mock" | "codex";
 
 export type AgentEventType =
   | "turn.started"
+  | "thread.idle"
   | "reasoning.started"
   | "file.change"
   | "command.started"
@@ -58,6 +59,7 @@ export type StateMeta = {
 
 export const agentEventTypes: AgentEventType[] = [
   "turn.started",
+  "thread.idle",
   "reasoning.started",
   "file.change",
   "command.started",
@@ -189,6 +191,8 @@ export function mapEventToState(
   switch (event.type) {
     case "turn.started":
       return "thinking";
+    case "thread.idle":
+      return "idle";
     case "reasoning.started":
       return "thinking";
     case "file.change":

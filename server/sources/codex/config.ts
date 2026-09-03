@@ -30,8 +30,27 @@ export function readCodexSourceConfigFromEnv(): CodexSourceConfig {
       threadId: process.env.AGENT_INDICATOR_CODEX_THREAD_ID,
       approvalPolicy: readApprovalPolicy(),
       sandbox: readSandboxMode(),
+      waitForClient: readBooleanEnv(
+        "AGENT_INDICATOR_CODEX_WAIT_FOR_CLIENT",
+        true,
+      ),
+    },
+    events: {
+      messageDeltaThrottleMs: Number(
+        process.env.AGENT_INDICATOR_CODEX_MESSAGE_DELTA_THROTTLE_MS ?? 300,
+      ),
     },
   };
+}
+
+function readBooleanEnv(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
+
+  if (value === undefined) {
+    return fallback;
+  }
+
+  return value !== "0" && value.toLowerCase() !== "false";
 }
 
 function readCodexLauncher(): CodexLauncher {

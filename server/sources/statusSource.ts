@@ -1,16 +1,15 @@
 import type { StatusMessage } from "../../src/domain/statusProtocol";
 
-export type PublishStatusMessage = (message: StatusMessage) => void;
+export type SendStatusMessage = (message: StatusMessage) => void;
 
 export type StatusSourceBridgeRuntime = {
+  sendStatusMessage: SendStatusMessage;
   getClientCount: () => number;
+  waitForClient: () => Promise<void>;
 };
 
 export type StatusSource = {
   name: string;
-  startPublishing: (
-    publish: PublishStatusMessage,
-    bridgeRuntime: StatusSourceBridgeRuntime,
-  ) => void;
+  startPublishing: (bridgeRuntime: StatusSourceBridgeRuntime) => void;
   stop: () => void;
 };

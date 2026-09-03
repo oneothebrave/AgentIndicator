@@ -1,13 +1,10 @@
-import type { PublishStatusMessage } from "../statusSource";
 import type { CodexAppServerClient } from "./client";
-import { publishAgentEvent } from "./events";
 import type { CodexThreadStartResult, CodexTurnConfig } from "./types";
 import { getNestedString } from "./utils";
 
 export async function startCodexSession(
   client: CodexAppServerClient,
   turnConfig: CodexTurnConfig,
-  publish: PublishStatusMessage,
 ) {
   client.start();
 
@@ -37,14 +34,6 @@ export async function startCodexSession(
   }
 
   const { threadId } = await startOrResumeThread(client, turnConfig);
-
-  publishAgentEvent(publish, {
-    type: "turn.started",
-    label: "Thinking",
-    detail: turnConfig.threadId
-      ? `Resumed Codex thread ${threadId}`
-      : `Started Codex thread ${threadId}`,
-  });
 
   await client.request("turn/start", {
     threadId,
