@@ -27,31 +27,79 @@ Codex / CLI / other agent
 
 - 增加 Node.js bridge 服务。
 - 对外提供 WebSocket：`ws://127.0.0.1:8787/status`。
-- 输入端先支持假事件文件，后续接 Codex app-server 或其他 CLI。
-- 输出端保持统一 JSON：
+- 输入端先支持 mock source，后续接 Codex app-server 或其他 CLI。
+- 输出端保持统一 WebSocket 消息协议，由 `src/domain/statusProtocol.ts` 定义和校验。
+
+连接建立时发送：
 
 ```json
 {
-  "state": "thinking",
-  "label": "Thinking",
-  "detail": "Reasoning about code changes",
-  "at": 1788179800000
+  "kind": "bridge.hello",
+  "source": "mock-bridge",
+  "version": 1,
+  "at": 1788179800000,
+  "intervalMs": 1600
 }
 ```
 
+状态更新时发送：
+
+```json
+{
+  "kind": "agent.event",
+  "event": {
+    "id": "...",
+    "type": "reasoning.started",
+    "origin": "mock",
+    "at": 1788179800000,
+    "label": "Thinking",
+    "detail": "Mock source is reasoning"
+  }
+}
+```
+
+`bridge.hello.source` 表示 bridge 服务实例，`agent.event.event.origin` 表示事件真正来自 `mock` 还是 `codex`。所有 status source 先通过 `normalizeAgentEvent()` 生成标准 `AgentEvent`，再通过 `agentEventMessage()` 包装后广播。
+
 当前 mock bridge 已提供：
 
-- `npm run bridge:mock` 通过 `server/index.ts` 启动本地 WebSocket 服务。
+- `npm run bridge:mock` 通过 `server/index.ts` 启动本地 WebSocket 服务。`server/sources/statusSource.ts` 保留为 source 合同定义。
 - `ws://127.0.0.1:8787/status` 推送 `bridge.hello` 和 `agent.event`。
 - `http://127.0.0.1:8787/health` 返回服务健康状态。
 - 浏览器前端固定连接 bridge，不提供 URL 输入框或启停开关。
 
+当前 Codex app-server bridge 已提供：
+
+- `npm run bridge:codex` 通过 `server/index.ts` 启动本地 WebSocket 服务，并默认选择 `codex` source。
+- `server/sources/codexSource.ts` 启动 `codex app-server --stdio`，完成 `initialize` / `initialized` 握手。
+- 设置 `AGENT_INDICATOR_CODEX_PROMPT` 后，bridge 会创建临时 Codex thread 并调用 `turn/start`，再把 app-server 推送的 `turn/*`、`item/*`、`thread/status/changed` 等事件映射成统一 `AgentEvent`。
+- 未设置 `AGENT_INDICATOR_CODEX_PROMPT` 时，只连接 app-server，不主动发起真实 Codex turn，避免无意消耗模型调用或改动工作区。
+
+PowerShell 示例：
+
+```powershell
+$env:AGENT_INDICATOR_CODEX_PROMPT = "只读检查当前项目结构，并用一句话总结。不要修改文件。"
+npm run bridge:codex
+```
+
+可选环境变量：
+
+| 变量 | 默认值 | 用途 |
+| --- | --- | --- |
+| `AGENT_INDICATOR_CODEX_PROMPT` | 空 | 要发给 Codex 的真实 turn 输入。为空时不启动 turn。 |
+| `AGENT_INDICATOR_CODEX_THREAD_ID` | 空 | 指定后用 `thread/resume` 续接已有 app-server thread。 |
+| `AGENT_INDICATOR_CODEX_CWD` | 当前项目目录 | Codex turn 的工作目录和 runtime workspace root。 |
+| `AGENT_INDICATOR_CODEX_MODEL` | Codex 配置默认值 | 可选模型覆盖。 |
+| `AGENT_INDICATOR_CODEX_EFFORT` | Codex 配置默认值 | 可选 reasoning effort 覆盖。 |
+| `AGENT_INDICATOR_CODEX_APPROVAL_POLICY` | `never` | app-server approval policy；支持 `never`、`on-request`、`untrusted`。 |
+| `AGENT_INDICATOR_CODEX_SANDBOX` | `read-only` | 默认只读；需要真实改文件时显式改为 `workspace-write`。 |
+| `AGENT_INDICATOR_CODEX_REQUEST_TIMEOUT_MS` | `30000` | JSON-RPC 请求超时时间。 |
+
 ## 阶段 3：真实 Agent 接入
 
-- Codex 优先走 `codex app-server` 的事件流。
+- Codex 优先走 `codex app-server` 的事件流，当前第一版已接入 app-server 管理的 thread/turn；它不是无侵入监听 Codex Desktop 当前 UI 任务。
 - OpenAI API 自建 agent 走 Responses API streaming events。
 - 其他 agent 先看官方 hooks/event stream；没有事件流时再封装 CLI stdout。
-- bridge 层负责把不同来源事件映射到统一状态。
+- bridge 层负责把不同来源事件映射到统一 `AgentEvent`。当前 `server/sources/codexSource.ts` 已提供 Codex app-server notification 到 `AgentEvent` 的映射入口。
 
 ## 阶段 4：硬件接入
 
@@ -79,5 +127,5 @@ Codex / CLI / other agent
 
 ## 当前完成范围
 
-本次先完成阶段 1，不接真实 Codex，也不写 ESP32 固件。这样能先把产品形态、状态命名和动画节奏定下来。
+已完成阶段 1、阶段 2 的 mock bridge、固定 WebSocket 协议和 source 合同，以及阶段 3 的 Codex app-server 第一版接入。ESP32 固件仍未实现。
 

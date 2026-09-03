@@ -1,0 +1,41 @@
+import type { JsonRpcRequestOrNotification } from "./jsonRpc";
+
+export function resolveServerRequest(request: JsonRpcRequestOrNotification) {
+  switch (request.method) {
+    case "currentTime/read":
+      return {
+        currentTimeAt: Math.floor(Date.now() / 1000),
+      };
+    case "item/commandExecution/requestApproval":
+      return { decision: "decline" };
+    case "item/fileChange/requestApproval":
+      return { decision: "decline" };
+    case "item/permissions/requestApproval":
+      return {
+        permissions: {},
+        scope: "turn",
+      };
+    case "item/tool/requestUserInput":
+      return { answers: {} };
+    case "mcpServer/elicitation/request":
+      return {
+        action: "decline",
+        content: null,
+        _meta: null,
+      };
+    case "applyPatchApproval":
+    case "execCommandApproval":
+      return {
+        decision: {
+          denied: {
+            rejection:
+              "Agent Indicator bridge does not implement approval UI yet.",
+          },
+        },
+      };
+    default:
+      throw new Error(
+        `Agent Indicator bridge does not implement server request: ${request.method}`,
+      );
+  }
+}

@@ -21,7 +21,7 @@ export function EventLog({ events }: EventLogProps) {
               <div>
                 <div className="eventMeta">
                   <strong>{event.type}</strong>
-                  <span>{event.source}</span>
+                  <span>{event.origin}</span>
                 </div>
                 <span className="eventDetail">
                   {event.detail ?? event.label ?? "status update"}

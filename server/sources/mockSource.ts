@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { demoTimeline } from "../../src/data/demoTimeline";
-import type { AgentEvent } from "../../src/domain/agentStatus";
+import {
+  agentEventMessage,
+  normalizeAgentEvent,
+} from "../../src/domain/statusProtocol";
 import type {
   PublishStatusMessage,
   StatusSource,
@@ -35,17 +38,16 @@ export function createMockSource({
         }
 
         const template = demoTimeline[sequence % demoTimeline.length];
-        const event: AgentEvent = {
+        const event = normalizeAgentEvent({
           id: randomUUID(),
           type: template.type,
-          at: Date.now(),
-          source: "bridge",
+          origin: "mock",
           label: template.label,
           detail: template.detail,
-        };
+        });
 
         sequence += 1;
-        publish({ kind: "agent.event", event });
+        publish(agentEventMessage(event));
       }, intervalMs);
     },
     stop() {

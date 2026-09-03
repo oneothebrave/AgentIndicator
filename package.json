@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "bridge": "tsx server/index.ts",
     "bridge:mock": "tsx server/index.ts",
+    "bridge:codex": "tsx server/index.ts",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },

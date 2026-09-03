@@ -12,7 +12,7 @@ export type AgentState =
   | "sleepy"
   | "sleep";
 
-export type AgentEventSource = "bridge";
+export type AgentEventOrigin = "mock" | "codex";
 
 export type AgentEventType =
   | "turn.started"
@@ -32,7 +32,7 @@ export type AgentEvent = {
   id: string;
   type: AgentEventType;
   at: number;
-  source: AgentEventSource;
+  origin: AgentEventOrigin;
   label?: string;
   detail?: string;
 };
@@ -46,7 +46,7 @@ export type AgentSnapshot = {
   updatedAt: number;
   eventCount: number;
   lastEventType?: AgentEventType;
-  lastEventSource?: AgentEventSource;
+  lastEventOrigin?: AgentEventOrigin;
 };
 
 export type StateMeta = {
@@ -70,6 +70,8 @@ export const agentEventTypes: AgentEventType[] = [
   "inactivity.sleepy",
   "inactivity.sleep",
 ];
+
+export const agentEventOrigins: AgentEventOrigin[] = ["mock", "codex"];
 
 export const stateMeta: Record<AgentState, StateMeta> = {
   idle: {
@@ -176,7 +178,7 @@ export function reduceAgentSnapshot(
     updatedAt: event.at,
     eventCount: snapshot.eventCount + 1,
     lastEventType: event.type,
-    lastEventSource: event.source,
+    lastEventOrigin: event.origin,
   };
 }
 
@@ -217,5 +219,12 @@ export function mapEventToState(
 export function isAgentEventType(value: unknown): value is AgentEventType {
   return (
     typeof value === "string" && agentEventTypes.includes(value as AgentEventType)
+  );
+}
+
+export function isAgentEventOrigin(value: unknown): value is AgentEventOrigin {
+  return (
+    typeof value === "string" &&
+    agentEventOrigins.includes(value as AgentEventOrigin)
   );
 }

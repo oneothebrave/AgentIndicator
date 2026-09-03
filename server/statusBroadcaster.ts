@@ -1,8 +1,8 @@
 import { createServer, type Server } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
-import type {
-  BridgeHelloMessage,
-  StatusMessage,
+import {
+  bridgeHelloMessage,
+  type StatusMessage,
 } from "../src/domain/statusProtocol";
 
 export type BridgeServerConfig = {
@@ -27,7 +27,13 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
 
   wss.on("connection", (client) => {
     clients.add(client);
-    send(client, createHelloMessage(config));
+    send(
+      client,
+      bridgeHelloMessage({
+        source: config.bridgeSource,
+        intervalMs: config.sourceIntervalMs,
+      }),
+    );
 
     client.on("close", () => {
       clients.delete(client);
@@ -91,16 +97,6 @@ function createHealthServer(
     response.writeHead(404, { "content-type": "application/json" });
     response.end(JSON.stringify({ ok: false, error: "not_found" }));
   });
-}
-
-function createHelloMessage(config: BridgeServerConfig): BridgeHelloMessage {
-  return {
-    kind: "bridge.hello",
-    source: config.bridgeSource,
-    version: 1,
-    at: Date.now(),
-    intervalMs: config.sourceIntervalMs,
-  };
 }
 
 function send(client: WebSocket, message: StatusMessage) {

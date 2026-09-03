@@ -1,6 +1,6 @@
 import type { AgentEvent } from "../domain/agentStatus";
 
-export type DemoEventTemplate = Omit<AgentEvent, "id" | "at" | "source">;
+export type DemoEventTemplate = Omit<AgentEvent, "id" | "at" | "origin">;
 
 export const demoTimeline: DemoEventTemplate[] = [
   {
