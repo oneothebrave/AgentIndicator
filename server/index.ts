@@ -1,17 +1,11 @@
 import {
+  type BridgeServerConfig,
   createBridgeServer,
   type BridgeServer,
 } from "./statusBroadcaster";
 import { createCodexSource } from "./sources/codexSource";
 import { createMockSource } from "./sources/mockSource";
 import type { StatusSource } from "./sources/statusSource";
-
-type BridgeRuntimeConfig = {
-  host: string;
-  port: number;
-  statusPath: string;
-  sourceIntervalMs?: number;
-};
 
 const host = process.env.AGENT_INDICATOR_HOST ?? "127.0.0.1";
 const port = Number(process.env.AGENT_INDICATOR_PORT ?? 8787);
@@ -42,7 +36,10 @@ function createStatusSource(name: string): StatusSource {
   throw new Error(`Unsupported AGENT_INDICATOR_SOURCE: ${name}`);
 }
 
-function startBridge(statusSource: StatusSource, config: BridgeRuntimeConfig) {
+function startBridge(
+  statusSource: StatusSource,
+  config: Omit<BridgeServerConfig, "bridgeSource">,
+) {
   const bridgeServer = createBridgeServer({
     ...config,
     bridgeSource: statusSource.name,

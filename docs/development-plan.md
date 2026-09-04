@@ -108,6 +108,13 @@ npm run bridge:codex
 - ESP32 固件只保留显示逻辑、动画状态机和简单连接状态。
 - 任何 token、账户认证和复杂解析都留在电脑端。
 
+## 后续完善 / Backlog
+
+这些项不阻塞硬件接入，放在事件链路稳定后的维护阶段处理：
+
+- 增加 `AGENT_INDICATOR_CODEX_DEBUG_EVENTS` 调试开关：默认只打印 app-server notification/request method，必要时再支持完整 payload 输出，用于排查真实 Codex 事件流。
+- 将 `.tmp` 里的临时事件采集脚本正式化：移动到 `scripts/`，并增加 npm script，作为不依赖前端 UI 的状态流验证工具。
+
 ## 状态集合
 
 | 状态 | 用途 |
