@@ -113,3 +113,57 @@ test("approval without an invocation ID is retained until the turn closes", () =
   t.send("PreToolUse", { turn_id: "next", tool_name: "Bash", tool_use_id: "next-tool" });
   assert.equal(t.last(), "command.started");
 });
+
+test("ID-less approval resumes on matching input; other same-name calls cannot clear it", () => {
+  const t = setup(); t.send("UserPromptSubmit");
+  const a = "a".repeat(64), b = "b".repeat(64);
+  t.send("PreToolUse", { tool_name: "Bash", tool_use_id: "approved", tool_input_hash: a });
+  t.send("PreToolUse", { tool_name: "Bash", tool_use_id: "other", tool_input_hash: b });
+  t.send("PermissionRequest", { tool_name: "Bash", tool_input_hash: a });
+  t.send("PostToolUse", { tool_name: "Bash", tool_use_id: "other", tool_input_hash: b });
+  assert.equal(t.last(), "approval.requested");
+  t.send("PostToolUse", { tool_name: "Bash", tool_use_id: "approved", tool_input_hash: a });
+  assert.equal(t.last(), "reasoning.started");
+  assert.equal(t.publisher.status().pendingApprovals, 0);
+  t.send("PreToolUse", { tool_name: "Bash", tool_use_id: "next" });
+  assert.equal(t.last(), "command.started");
+});
+
+test("identical parallel calls keep ambiguous approval until all candidates finish", () => {
+  const t = setup(); t.send("UserPromptSubmit");
+  const fields = { tool_name: "Bash", tool_input_hash: "a".repeat(64) };
+  t.send("PreToolUse", { ...fields, tool_use_id: "a" });
+  t.send("PreToolUse", { ...fields, tool_use_id: "b" });
+  t.send("PermissionRequest", fields);
+  t.send("PostToolUse", { ...fields, tool_use_id: "a" });
+  assert.equal(t.last(), "approval.requested");
+  t.send("PostToolUse", { ...fields, tool_use_id: "b" });
+  assert.equal(t.last(), "reasoning.started");
+});
+
+test("missing PreToolUse can recover with matching PostToolUse; rejected approvals can finish normally", () => {
+  const t = setup(); t.send("UserPromptSubmit");
+  const fields = { tool_name: "Bash", tool_input_hash: "a".repeat(64) };
+  t.send("PermissionRequest", fields);
+  t.send("PostToolUse", { ...fields, tool_use_id: "returned-error" });
+  assert.equal(t.last(), "reasoning.started");
+  t.send("Stop"); assert.equal(t.last(), "turn.completed");
+});
+
+test("older observed prompts and duplicate prompts do not replace active work", () => {
+  const t = setup(); t.send("UserPromptSubmit", { observed_at: 200 });
+  t.send("PreToolUse", { tool_name: "Bash", tool_use_id: "active" });
+  assert.equal(t.send("UserPromptSubmit", { turn_id: "old", observed_at: 100 }), false);
+  assert.equal(t.send("UserPromptSubmit", { observed_at: 201 }), false);
+  assert.equal(t.publisher.status().activeTools, 1);
+  assert.equal(t.send("UserPromptSubmit", { turn_id: "next", observed_at: 300 }), true);
+  assert.equal(t.publisher.status().activeTools, 0);
+});
+
+test("subagent completion never completes its parent turn", () => {
+  const t = setup(); t.send("UserPromptSubmit");
+  t.send("SubagentStart", { agent_id: "a" }); t.send("SubagentStart", { agent_id: "b" });
+  t.send("SubagentStop", { agent_id: "a" }); assert.equal(t.last(), "tool.started");
+  t.send("SubagentStop", { agent_id: "b" }); assert.equal(t.last(), "reasoning.started");
+  t.send("Stop"); assert.equal(t.last(), "turn.completed");
+});

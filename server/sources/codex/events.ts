@@ -12,6 +12,7 @@ import type {
   CodexNotification,
 } from "./types";
 import { getErrorMessage, getNestedString, getNestedValue } from "./utils";
+import { CodexLifecycle } from "./lifecycle";
 
 const CODEX_SOURCE_ORIGIN = "codex";
 
@@ -29,6 +30,7 @@ export function createCodexEventPublisher({
   sendStatusMessage: SendStatusMessage;
 }): CodexEventPublisher {
   let lastMessageDeltaSentAt = 0;
+  const lifecycle = new CodexLifecycle();
 
   const sendAgentEvent = (event: AgentEvent | undefined) => {
     if (!event) {
@@ -52,10 +54,12 @@ export function createCodexEventPublisher({
 
   return {
     publishNotificationFromCodex(notification) {
-      sendAgentEvent(mapCodexNotificationToAgentEvent(notification));
+      const event = lifecycle.notification(notification, mapCodexNotificationToAgentEvent(notification));
+      if (process.env.AGENT_INDICATOR_DEBUG_EVENTS === "1") console.log(`[codex-event] ${notification.method} -> ${event?.type ?? "ignored"}`);
+      sendAgentEvent(event);
     },
     publishServerRequestFromCodex(request) {
-      sendAgentEvent(mapCodexServerRequestToAgentEvent(request));
+      sendAgentEvent(lifecycle.request(request, mapCodexServerRequestToAgentEvent(request)));
     },
     publishAgentEvent(input) {
       sendStatusMessage(createAgentEventMessage(createCodexAgentEvent(input)));
@@ -108,6 +112,7 @@ function mapCodexNotificationToInput(
 ): CodexAgentEventInput | undefined {
   switch (notification.method) {
     case "error":
+      if (getNestedValue(notification.params, ["willRetry"]) !== false) return undefined;
       return {
         type: "turn.failed",
         label: "Error",
@@ -200,6 +205,10 @@ function mapThreadStatusChanged(
   const status = getNestedString(params, ["status", "type"]);
 
   if (status === "active") {
+    const flags = getNestedValue(params, ["status", "activeFlags"]);
+    if (Array.isArray(flags) && flags.some(flag => flag === "waitingOnApproval" || flag === "waitingOnUserInput")) {
+      return { type: "approval.requested", label: "Waiting", detail: "Codex is waiting for approval or input" };
+    }
     return {
       type: "reasoning.started",
       label: "Thinking",
@@ -226,8 +235,8 @@ function mapThreadStatusChanged(
   return undefined;
 }
 
-function mapTurnCompleted(params: unknown): CodexAgentEventInput {
-  const status = getNestedString(params, ["turn", "status", "type"]);
+function mapTurnCompleted(params: unknown): CodexAgentEventInput | undefined {
+  const status = getNestedString(params, ["turn", "status"]);
 
   if (status === "failed") {
     return {
@@ -242,12 +251,13 @@ function mapTurnCompleted(params: unknown): CodexAgentEventInput {
 
   if (status === "interrupted") {
     return {
-      type: "turn.completed",
+      type: "thread.idle",
       label: "Interrupted",
       detail: "Codex turn was interrupted",
     };
   }
 
+  if (status !== "completed") return undefined;
   return {
     type: "turn.completed",
     label: "Done",
@@ -266,7 +276,7 @@ function mapItemStarted(params: unknown): CodexAgentEventInput | undefined {
     return undefined;
   }
 
-  if (itemType === "reasoning" || itemType === "plan") {
+  if (itemType === "reasoning" || itemType === "plan" || itemType === "contextCompaction") {
     return {
       type: "reasoning.started",
       label: "Thinking",
@@ -303,7 +313,8 @@ function mapItemStarted(params: unknown): CodexAgentEventInput | undefined {
   if (
     itemType === "mcpToolCall" ||
     itemType === "dynamicToolCall" ||
-    itemType === "collabAgentToolCall"
+    itemType === "collabAgentToolCall" ||
+    itemType === "imageGeneration" || itemType === "imageView"
   ) {
     return {
       type: "tool.started",
@@ -330,22 +341,8 @@ function mapItemCompleted(params: unknown): CodexAgentEventInput | undefined {
     return undefined;
   }
 
-  const itemStatus =
-    getNestedString(params, ["item", "status", "type"]) ??
-    getNestedString(params, ["item", "status"]);
-
-  if (
-    itemStatus === "failed" ||
-    itemStatus === "error" ||
-    getNestedValue(params, ["item", "error"])
-  ) {
-    return {
-      type: "turn.failed",
-      label: "Error",
-      detail: `Codex ${itemType} failed`,
-    };
-  }
-
+  // Tool failure is model input, not a terminal turn failure. The publisher
+  // restores the remaining activity; turn/completed owns the final outcome.
   return undefined;
 }
 

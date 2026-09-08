@@ -1,6 +1,6 @@
 // A notification-only hook. Never emit approval decisions or model context.
 import { request } from "node:http";
-import { randomUUID } from "node:crypto";
+import { hookPayload } from "./hook-payload.mjs";
 
 const deadline = setTimeout(() => finish(), 800);
 let finished = false;
@@ -23,10 +23,7 @@ process.stdin.on("data", chunk => {
 process.stdin.on("end", () => {
   try {
     const raw = JSON.parse(input);
-    const event = { id: randomUUID() };
-    for (const key of ["hook_event_name", "session_id", "turn_id", "tool_name", "tool_use_id"]) {
-      if (typeof raw[key] === "string" && raw[key].length <= 256) event[key] = raw[key];
-    }
+    const event = hookPayload(raw);
     const body = JSON.stringify(event);
     const req = request({ hostname: "127.0.0.1", port: Number(process.env.AGENT_INDICATOR_HOOK_PORT ?? 8788), path: "/hook", method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }, timeout: 300 }, res => {
       res.resume();

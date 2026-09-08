@@ -2,7 +2,7 @@
 
 ## 日常启动
 
-当前项目已安装并在 Codex CLI 0.153.0 中审核启用通知 hooks。开两个终端：
+当前项目已在 Codex CLI 0.153.4 中安装并审核启用通知 hooks，包括 SubagentStart/SubagentStop。当前修复与测试结论见 [2026-09-09 验收](fix-validation-2026-09-09.md)。开两个终端：
 
 终端一（保持运行）：
 
@@ -105,7 +105,7 @@ npm run hooks:install -- --global
 
 用户级 hooks 也可能由使用同一配置的其他 Codex 客户端触发；hook 公共输入不能可靠区分 CLI 与桌面客户端。需要时用会话 ID 固定目标。全局移除使用 `npm run hooks:install -- --global --uninstall`。
 
-## 已验证
+## 历史验证记录
 
 - 一键启动与诊断：隔离端口验证全新启动、旧 SOURCE 环境变量不会启动 app-server、重复启动复用、错误服务占用不被终止、诊断离线返回失败、HTTP 卡住时在期限内结束。
 - 模拟 WebSocket 客户端断开再连接、hooks 事件通过新启动器传播已通过自动化测试；这不替代物理 Wi-Fi 中断与长期运行验收。
@@ -136,10 +136,20 @@ npm run stability -- --minutes 720
 
 ## 终止错误补充检测（2026-09-07）
 
-截图中的模型 404 回合仅收到 UserPromptSubmit，未收到 Stop；本地 transcript 存在 event_msg/task_complete，包含对应 turn_id 和 error.message。因此新增 terminalFailure.ts 兼容适配：每秒检查已绑定会话文件末尾最多 64 KiB，只接受当前回合的显式终止错误，映射 turn.failed。不读取其他会话内容，不输出或传输错误正文、prompt、模型回复；延迟的工具事件不能覆盖 error，新回合可正常开始。
+截图中的模型 404 回合仅收到 UserPromptSubmit，未收到 Stop；本地 transcript 存在 event_msg/task_complete，包含对应 turn_id 和 error.message。当前 terminalFailure.ts 每秒增量读取已绑定会话，按完整 JSONL 记录判断当前轮的显式终止错误，映射 turn.failed。首次绑定/切换回合从文件开头扫描，单轮读取预算 4MiB，单条记录上限 8MiB，支持跨读取边界和分段写入。不会向硬件输出错误正文、prompt 或模型回复。
 
-[官方 hooks 文档](https://learn.chatgpt.com/docs/hooks) 未列出终止错误 hook，并明确 transcript 格式不稳定。此适配已针对本机 CLI 0.153.4 的记录验证；CLI 升级后需复测。缺失文件、未知格式、部分行或超过尾部读取窗口的记录不会推测为失败；不以超时把思考判成错误。扫描文件名定位当前会话，找不到时每 10 秒重试。后续若有官方错误 hook，应迁移至该接口。
+[官方 hooks 文档](https://learn.chatgpt.com/docs/hooks) 未列出终止错误 hook，并明确 transcript 格式不稳定。此适配针对 CLI 0.153.4；升级后需复测。缺失/歧义文件、未知格式、未写完的行和过大的记录不会被推测为失败；监听能力通过 hooks `/health` 的 terminalObserver 与 doctor 报告。路径消失后重新定位，超大记录被诊断并跳过，后续记录仍能处理。不以超时把思考判成错误。后续若有官方错误 hook，应迁移至该接口。
 
 验证：34 项测试通过，生产构建通过。恢复此前失败会话的绑定后，读取原始 404 终止记录（未重新调用模型），实机串口依次显示 thinking → error，bridge 最新事件为 turn.failed。此次验证不证明所有 CLI 失败路径均已覆盖。
 
 2026-09-07：修复终止失败后旧会话占用绑定。error 保持至下一条有效请求；未固定会话时，失败后新 CLI 的 UserPromptSubmit 可接管。迟到工具事件、旧回合重复提交、旧 SessionEnd 均不能覆盖新会话；显式 pinned session 保留约束。活动回合仍保持单会话所有权。36 项测试及构建通过。
+
+## 当前关联规则与诊断
+
+sender 只发送事件身份、会话/轮次、工具名/调用 ID、可选子代理 ID、观察时间与输入摘要。`tool_input_hash` 是限定在会话/轮次内的 SHA-256 指纹，不传命令/输入原文。Bash/apply_patch 使用 command 字段，避免审批说明影响关联。
+
+审批没有调用 ID 时，通过输入指纹关联 PostToolUse，匹配完成后恢复剩余工具或 thinking；多个相同输入的并行调用会保守等待所有候选完成。既无 ID 又无可匹配输入的事件仍只能等回合关闭；不凭同名工具完成清空审批。hooks 没有统一的“用户已批准、命令刚开始”回调，因此耗时工具可能要等对应 PostToolUse 才退出 waiting；这是来源可观察性的边界。
+
+明确的终止失败可以修正仍属于当前轮的 Stop 完成状态，不能覆盖中断或新轮。发送器观察时间用于拒绝已知更早的 prompt，重复 prompt 不会清空活动工具；它不提供跨进程启动的严格全序。CLI 无 SessionEnd 的突然消失仍使用 `npm run session:reset`，不猜测其他终端或 Desktop 的归属。
+
+默认关闭逐事件日志。调试时在启动 bridge 的终端设置 `$env:AGENT_INDICATOR_DEBUG_EVENTS='1'`；只记录方法名、事件类型与关联标识，不打印原始 payload。`npm run events:capture -- 60` 只读采集 60 秒 WebSocket 状态到 `.tmp/events/`，不记录 detail、prompt 或命令原文。采集器本身算一个 WebSocket 客户端。

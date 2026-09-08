@@ -13,7 +13,7 @@ const legacyCommand = `"${process.execPath}" "${sender}"`;
 const command = process.platform === "win32"
   ? `& '${process.execPath.replaceAll("'", "''")}' '${sender.replaceAll("'", "''")}'`
   : legacyCommand;
-const events = ["SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop", "Interrupt", "PreCompact", "PostCompact"];
+const events = ["SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop", "Interrupt", "PreCompact", "PostCompact", "SubagentStart", "SubagentStop"];
 let config = {};
 let original;
 try { original = await readFile(target, "utf8"); config = JSON.parse(original); }

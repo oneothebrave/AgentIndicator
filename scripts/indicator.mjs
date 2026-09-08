@@ -66,6 +66,11 @@ function report(status) {
     console.log(`[事件] 最近类型：${typeof event?.type === "string" ? event.type : "暂无"}；来源：${typeof event?.origin === "string" ? event.origin : "暂无"}`);
   }
   if (status.hooksOK) console.log(`[会话] ${status.hooks.sessionId ? "已绑定会话" : "等待 CLI 活动"}；接收 ${status.hooks.accepted ?? 0}，忽略 ${status.hooks.ignored ?? 0}。`);
+  if (status.hooksOK && status.hooks.terminalObserver) {
+    const o = status.hooks.terminalObserver;
+    const label = o.phase === "unbound" ? "等待 CLI 活动" : o.phase === "reading" && !o.error ? "正常" : `${o.phase}${o.error ? `；${o.error}` : ""}`;
+    console.log(`[终止错误监听] ${label}。`);
+  }
 }
 
 async function localChecks(config) {

@@ -1,5 +1,11 @@
 # Agent Indicator 开发计划
 
+## 当前状态（2026-09-09）
+
+日常入口为 `npm start`＋普通 Codex CLI；设备为已购买的 M5StackChan ESP32-S3。当前固件 `2026.09.08-r1`，银色 motion-eyes-v5，空闲水平、工作抬头 20°。已完成本轮状态、错误监听、舵机修复与烧录；具体覆盖和剩余边界以 [修复验收记录](fix-validation-2026-09-09.md) 为准。下方带日期或旧版本的条目属于历史过程，不能代替当前验收结论。
+
+自动化入口：`npm test`（54 项），`npm run test:contract`（本机 Codex 协议契约），PlatformIO `logic-test`（ESP32 上 120 条断言）。debug event 开关与脱敏事件采集已实现：`AGENT_INDICATOR_DEBUG_EVENTS=1`、`npm run events:capture -- 60`。12 小时有效连续采样、路由器断网和机械故障注入仍需单独验收。
+
 ## 目标
 
 先用浏览器完成圆屏模拟器和 Agent 状态机，再把同一套状态协议接到已购买并确认的 M5StackChan AI Desktop Robot（ESP32-S3）硬件。前端只作为模拟器消费 bridge 推送的统一事件，不再继续打磨表情/UI，不提供本地 mock、手动状态切换或关闭 stream 的入口。
@@ -131,10 +137,10 @@ npm run bridge:mock
 
 日常交互式 CLI 接入已增加 `codex-hooks` source：使用 `npm run bridge:cli` 和普通 `codex`，无需测试 prompt。具体安装、会话绑定和限制见 [CLI hooks 接入](cli-hooks.md)。已完成真实 CLI 多轮命令、文件修改、中断、退出及硬件目视验收。真实审批与长期运行仍待验证。
 
-这些项不阻塞硬件接入，放在事件链路稳定后的维护阶段处理：
+事件诊断维护项（2026-09-09 已完成）：
 
-- 增加 `AGENT_INDICATOR_CODEX_DEBUG_EVENTS` 调试开关：默认只打印 app-server notification/request method，必要时再支持完整 payload 输出，用于排查真实 Codex 事件流。
-- 将 `.tmp` 里的临时事件采集脚本正式化：移动到 `scripts/`，并增加 npm script，作为不依赖前端 UI 的状态流验证工具。
+- 已实现 `AGENT_INDICATOR_DEBUG_EVENTS=1`，统一控制 hooks 与 app-server 的逐事件诊断；默认关闭，不输出完整 payload。
+- 已实现 `scripts/capture-status-events.mjs` 与 `npm run events:capture -- 60`，脱敏采集统一状态流，供无前端验收使用。
 
 ## 状态集合
 

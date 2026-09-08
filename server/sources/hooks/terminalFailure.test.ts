@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hasTerminalFailure } from "./terminalFailure";
+import { createTerminalFailureWatcher, hasTerminalFailure } from "./terminalFailure";
+import { mkdtemp, writeFile, appendFile, rm, rename } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createHookEventPublisher } from "./events";
 import type { StatusMessage } from "../../../src/domain/statusProtocol";
 
@@ -53,4 +56,70 @@ test("failure takeover respects pinned sessions and active ownership", () => {
     p.failTurn("old", "t");
     assert.equal(p.receive({ id: "3", session_id: "new", turn_id: "n", hook_event_name: "UserPromptSubmit" }), !pinned);
   }
+});
+
+test("terminal failure corrects current completion, never cancellation or a newer turn", () => {
+  const p = createHookEventPublisher(() => {});
+  p.receive({ id: "1", session_id: "s", turn_id: "t", hook_event_name: "UserPromptSubmit" });
+  p.receive({ id: "2", session_id: "s", turn_id: "t", hook_event_name: "Stop" });
+  assert.equal(p.failTurn("s", "t"), true);
+  assert.equal(p.failTurn("s", "t"), false);
+  p.receive({ id: "3", session_id: "s", turn_id: "next", hook_event_name: "UserPromptSubmit" });
+  assert.equal(p.failTurn("s", "t"), false);
+  p.receive({ id: "4", session_id: "s", turn_id: "next", hook_event_name: "Interrupt" });
+  assert.equal(p.failTurn("s", "next"), false);
+});
+
+const terminal = (turn: string, text = "") => JSON.stringify({ type: "event_msg", payload: { type: "task_complete", turn_id: turn, last_agent_message: text, error: { message: "404" } } }) + "\n";
+async function fixture() {
+  const root = await mkdtemp(join(tmpdir(), "indicator-watcher-test-"));
+  return { root, path: join(root, "rollout-session.jsonl"), clean: () => rm(root, { recursive: true, force: true }) };
+}
+
+test("incremental watcher handles long UTF-8 records, partial writes and duplicate polls", async () => {
+  const f = await fixture(); let count = 0;
+  const w = createTerminalFailureWatcher(f.root, () => ({ sessionId: "session", turnId: "t" }), () => count++, { bytesPerPoll: 65536 });
+  try {
+    const bytes = Buffer.from(terminal("t", "中文".repeat(40000)));
+    await writeFile(f.path, bytes.subarray(0, bytes.length - 1));
+    for (let i = 0; i < 5; i++) await w.poll();
+    assert.equal(count, 0);
+    await appendFile(f.path, "\n"); await w.poll(); await w.poll();
+    assert.equal(count, 1); assert.equal(w.status().phase, "reading");
+  } finally { w.stop(); await f.clean(); }
+});
+
+test("watcher relocates missing files and resets reader on replacement or truncation", async () => {
+  const f = await fixture(); let count = 0;
+  const w = createTerminalFailureWatcher(f.root, () => ({ sessionId: "session", turnId: "t" }), () => count++);
+  try {
+    await w.poll(); assert.equal(w.status().phase, "missing");
+    await writeFile(f.path, '{}\n'.repeat(100)); await w.poll();
+    await rename(f.path, join(f.root, "archived.jsonl")); await w.poll();
+    assert.equal(w.status().phase, "error");
+    await writeFile(f.path, terminal("t")); await w.poll(); assert.equal(count, 1);
+    await writeFile(f.path, '{}\n'); await w.poll();
+    await appendFile(f.path, terminal("t")); await w.poll(); assert.equal(count, 2);
+  } finally { w.stop(); await f.clean(); }
+});
+
+test("oversized records are diagnosed; subsequent valid records still work", async () => {
+  const f = await fixture(); let count = 0;
+  const w = createTerminalFailureWatcher(f.root, () => ({ sessionId: "session", turnId: "t" }), () => count++, { maxRecordBytes: 512 });
+  try {
+    await writeFile(f.path, terminal("t", "x".repeat(1000)) + terminal("t")); await w.poll();
+    assert.equal(count, 1); assert.equal(w.status().oversizedRecords, 1);
+    assert.equal(w.status().error, "record_too_large");
+  } finally { w.stop(); await f.clean(); }
+});
+
+test("rebinding rescans existing records, stale reads and stopped callbacks are suppressed", async () => {
+  const f = await fixture(); let count = 0, turnId = "old";
+  const w = createTerminalFailureWatcher(f.root, () => ({ sessionId: "session", turnId }), () => count++);
+  try {
+    await writeFile(f.path, terminal("new")); await w.poll(); assert.equal(count, 0);
+    turnId = "new"; await w.poll(); assert.equal(count, 1);
+    await writeFile(f.path, terminal("later")); turnId = "later";
+    const pending = w.poll(); w.stop(); await pending; assert.equal(count, 1);
+  } finally { w.stop(); await f.clean(); }
 });

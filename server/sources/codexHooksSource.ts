@@ -8,7 +8,7 @@ import type { StatusSource } from "./statusSource";
 
 export function createCodexHooksSource(port = Number(process.env.AGENT_INDICATOR_HOOK_PORT ?? 8788)): StatusSource {
   let server: ReturnType<typeof createServer> | undefined;
-  let stopFailureWatcher: (() => void) | undefined;
+  let stopFailureWatcher: ReturnType<typeof watchTerminalFailures> | undefined;
   return {
     name: "codex-cli-hooks",
     startPublishing(runtime) {
@@ -19,7 +19,7 @@ export function createCodexHooksSource(port = Number(process.env.AGENT_INDICATOR
         // No browser ingestion, no LAN ingress: the listener is loopback-only.
         if (req.headers.origin) { res.writeHead(403).end("{}"); return; }
         if (req.method === "GET" && req.url === "/health") {
-          res.end(JSON.stringify({ ok: true, source: "codex-cli-hooks", ...publisher.status() })); return;
+          res.end(JSON.stringify({ ok: true, source: "codex-cli-hooks", ...publisher.status(), terminalObserver: stopFailureWatcher?.status() })); return;
         }
         if (req.method !== "POST" || !["/hook", "/session/reset"].includes(req.url ?? "")) { res.writeHead(404).end("{}"); return; }
         if (req.headers["content-type"] !== "application/json") { res.writeHead(415).end("{}"); return; }

@@ -1,0 +1,2 @@
+#pragma once
+#define INDICATOR_FIRMWARE_VERSION "2026.09.08-r1"

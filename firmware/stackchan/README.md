@@ -115,4 +115,18 @@ npm run bridge:codex
 
 编译和 COM3 烧录哈希校验通过，程序 1,063,661 字节；串口确认 motion-eyes-v5-net-task、framebuffer=1，Wi-Fi 成功连接并尝试连接 bridge。当前 bridge 停止，实屏流畅度与触摸验收待用户确认。此维护重启不计入连续稳定运行采样。
 
-头部运动已启用：水平 raw=591，工作抬头 10°至 raw=623，900ms 定时移动。用户确认小幅抬头回平测试正常。详见 [头部姿态](../../docs/head-motion.md)。
+头部运动已启用：水平 raw=591，工作抬头 20°至 raw=655，900ms 定时移动。当前固件 `2026.09.08-r1` 修复同姿态恢复扭矩并限制故障重试。详见 [头部姿态](../../docs/head-motion.md) 与 [修复验收](../../docs/fix-validation-2026-09-09.md)。
+
+## 固件回归测试
+
+`logic-test` 环境在 ESP32 上运行头部纯策略、动画关键帧和协议解析测试，不初始化舵机、Wi-Fi 或 NVS。编译并烧录此环境后，用串口读取 `LOGIC_TEST_RESULT checks=120 failures=0`。**测试结束后必须重新烧录 `status-client`**，设备才能恢复正常工作。
+
+```powershell
+$env:PLATFORMIO_CORE_DIR = 'E:\AgentIndicator\.tmp\platformio'
+.tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e logic-test -t upload --upload-port COM3
+.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --seconds 8 --expect 'failures=0'
+.tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e status-client -t upload --upload-port COM3
+.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --seconds 5 --send v
+```
+
+串口根据本机实际端口替换 COM3；辅助脚本依赖 pyserial。固件版本也显示在触摸调试页底部。

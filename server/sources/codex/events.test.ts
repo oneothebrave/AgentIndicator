@@ -35,7 +35,7 @@ describe("Codex app-server notification mapping", () => {
   it("maps turn lifecycle notifications", () => {
     assertNotificationEvent({ method: "turn/started" }, "turn.started");
     assertNotificationEvent(
-      { method: "turn/completed", params: { turn: { status: { type: "completed" } } } },
+      { method: "turn/completed", params: { turn: { status: "completed" } } },
       "turn.completed",
     );
     assertNotificationEvent(
@@ -43,7 +43,7 @@ describe("Codex app-server notification mapping", () => {
         method: "turn/completed",
         params: {
           turn: {
-            status: { type: "failed" },
+            status: "failed",
             error: { message: "model failed" },
           },
         },
@@ -201,7 +201,7 @@ describe("Codex event publisher", () => {
 
     publisher.publishNotificationFromCodex({ method: "item/agentMessage/delta" });
     publisher.publishNotificationFromCodex({ method: "item/agentMessage/delta" });
-    publisher.publishNotificationFromCodex({ method: "turn/completed" });
+    publisher.publishNotificationFromCodex({ method: "turn/completed", params: { turn: { status: "completed" } } });
 
     assert.deepEqual(
       messages.map((message) => message.kind === AGENT_EVENT_KIND && message.event.type),

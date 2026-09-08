@@ -14,7 +14,9 @@
     "bridge:codex": "tsx server/index.ts",
     "bridge:cli": "tsx server/cli.ts",
     "hooks:install": "node scripts/install-codex-hooks.mjs",
-    "test": "node --import tsx --test server/statusBroadcaster.test.ts server/sources/codex/events.test.ts server/sources/hooks/*.test.ts scripts/indicator.test.mjs",
+    "test": "node --import tsx --test server/*.test.ts server/sources/codex/*.test.ts server/sources/hooks/*.test.ts scripts/*.test.mjs",
+    "test:contract": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-codex-contract.ps1",
+    "events:capture": "node scripts/capture-status-events.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },

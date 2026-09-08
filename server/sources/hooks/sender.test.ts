@@ -23,7 +23,9 @@ test("sender removes private payloads and never supplies an approval decision", 
   try {
     await invoke((server.address() as AddressInfo).port, JSON.stringify({ hook_event_name: "PermissionRequest", session_id: "s", turn_id: "t", tool_name: "Bash", prompt: "private", tool_input: { command: "private" }, tool_response: "private", transcript_path: "private" }));
     const event = JSON.parse(body);
-    assert.deepEqual(Object.keys(event).sort(), ["hook_event_name", "id", "session_id", "tool_name", "turn_id"]);
+    assert.deepEqual(Object.keys(event).sort(), ["hook_event_name", "id", "observed_at", "session_id", "tool_input_hash", "tool_name", "turn_id"]);
+    assert.match(event.tool_input_hash, /^[a-f0-9]{64}$/);
+    assert.ok(Number.isSafeInteger(event.observed_at));
     assert.equal(event.hook_event_name, "PermissionRequest");
     assert.ok(!body.includes("private"));
   } finally { server.close(); }

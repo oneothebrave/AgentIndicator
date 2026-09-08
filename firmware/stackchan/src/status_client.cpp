@@ -10,6 +10,8 @@
 #include "event_states.h"
 #include "face_renderer.h"
 #include "head_motion.h"
+#include "status_message.h"
+#include "firmware_version.h"
 
 #if __has_include("config.local.h")
 #include "config.local.h"
@@ -91,51 +93,28 @@ void draw() {
   M5.Display.printf("Bridge: %s:%u", BRIDGE_HOST, BRIDGE_PORT);
   M5.Display.setCursor(16, 217);
   M5.Display.printf("IP: %s", wifiConnected ? IPAddress(displayed.ip).toString().c_str() : "-");
+  M5.Display.setCursor(16, 231);
+  M5.Display.printf("Firmware: %s", INDICATOR_FIRMWARE_VERSION);
 }
 
 void receiveMessage(uint8_t* payload, size_t length) {
-  // This bridge sends small, unfragmented text frames. Bound JSON allocation.
-  if (length > 8192) {
-    Serial.println("status-client rejected=oversize");
-    return;
+  const auto decoded = decodeStatusMessage(payload, length, protocolReady);
+  switch(decoded.kind) {
+    case MessageKind::Hello:
+      protocolReady = true; currentEvent = nullptr; origin = "-";
+      setConnection("Connected");
+      Serial.println("status-client hello version=1");
+      break;
+    case MessageKind::ProtocolError:
+      protocolReady = false; setConnection("Protocol error"); break;
+    case MessageKind::Event:
+      currentEvent = decoded.event; origin = decoded.origin; ++eventCount;
+      Serial.printf("status-client event=%s state=%s origin=%s count=%lu\n",
+        currentEvent->event, currentEvent->state, origin, (unsigned long)eventCount);
+      break;
+    case MessageKind::Ignored: break;
+    default: Serial.printf("status-client rejected=%d\n", (int)decoded.kind); break;
   }
-  JsonDocument doc;
-  if (deserializeJson(doc, payload, length, DeserializationOption::NestingLimit(5))) {
-    Serial.println("status-client rejected=json");
-    return;
-  }
-  const char* kind = doc["kind"] | "";
-  if (strcmp(kind, "bridge.hello") == 0) {
-    if (!doc["version"].is<int>() || doc["version"].as<int>() != 1 ||
-        !doc["source"].is<const char*>() || !doc["at"].is<double>() ||
-        (!doc["intervalMs"].isUnbound() && !doc["intervalMs"].is<double>())) {
-      protocolReady = false;
-      setConnection("Protocol error");
-      return;
-    }
-    protocolReady = true;
-    currentEvent = nullptr;
-    origin = "-";
-    setConnection("Connected");
-    Serial.println("status-client hello version=1");
-    return;
-  }
-  if (!protocolReady || strcmp(kind, "agent.event") != 0) return;
-  JsonObjectConst event = doc["event"].as<JsonObjectConst>();
-  const auto* mapping = findEventState(event["type"] | "");
-  const char* eventOrigin = event["origin"] | "";
-  if (!mapping || !event["id"].is<const char*>() || !event["at"].is<double>() ||
-      (strcmp(eventOrigin, "mock") != 0 && strcmp(eventOrigin, "codex") != 0) ||
-      (!event["label"].isUnbound() && !event["label"].is<const char*>()) ||
-      (!event["detail"].isUnbound() && !event["detail"].is<const char*>())) {
-    Serial.println("status-client rejected=event");
-    return;
-  }
-  currentEvent = mapping;
-  origin = strcmp(eventOrigin, "codex") == 0 ? "codex" : "mock";
-  ++eventCount;
-  Serial.printf("status-client event=%s state=%s origin=%s count=%lu\n",
-                mapping->event, mapping->state, origin, (unsigned long)eventCount);
 }
 
 void onSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
@@ -150,6 +129,7 @@ void onSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
       socketConnected = false;
       protocolReady = false;
       setConnection(wifiConnected ? "Bridge connecting" : "Wi-Fi connecting");
+      publishDisplayState();
       break;
     case WStype_TEXT:
       receiveMessage(payload, length);
@@ -168,6 +148,7 @@ void setup() {
   cfg.internal_mic = false;
   cfg.internal_spk = false;
   M5.begin(cfg);
+  Serial.printf("firmware version=%s design=motion-eyes-v5-silver rise=20deg\n", INDICATOR_FIRMWARE_VERSION);
   Serial.begin(115200);
   M5.Display.setRotation(1);
   M5.Display.setBrightness(100);
@@ -195,7 +176,8 @@ void loop() {
   DisplayState latest;
   if (displayQueue && xQueueReceive(displayQueue, &latest, 0) == pdTRUE) {
     dirty = dirty || latest.wifiConnected != displayed.wifiConnected || latest.protocolReady != displayed.protocolReady
-      || latest.eventCount != displayed.eventCount || latest.connectionLabel != displayed.connectionLabel || latest.ip != displayed.ip;
+      || latest.eventCount != displayed.eventCount || latest.connectionLabel != displayed.connectionLabel || latest.ip != displayed.ip
+      || latest.currentEvent != displayed.currentEvent || latest.origin != displayed.origin;
     displayed = latest;
   }
   head.update(displayed.protocolReady, displayed.currentEvent ? displayed.currentEvent->state : "idle");
@@ -241,10 +223,11 @@ void networkTask(void*) {
         socketStarted = true;
       }
     } else {
-      socket.disconnect();
       socketConnected = false;
       protocolReady = false;
       setConnection("Wi-Fi connecting");
+      publishDisplayState();
+      socket.disconnect();
     }
   }
   if (connected) {
