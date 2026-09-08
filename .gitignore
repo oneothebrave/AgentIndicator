@@ -2,6 +2,10 @@ node_modules/
 dist/
 .vite/
 .tmp/
+.codex/hooks.json
+.codex/hooks.json.*.bak
+.pio/
+firmware/stackchan/include/config.local.h
 
 *.local
 *.log

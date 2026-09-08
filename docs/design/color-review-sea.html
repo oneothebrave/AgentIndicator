@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v5 · 大眼与离线表情预览</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#f2f0ed;color:#25242c;font:16px/1.8 "Microsoft YaHei",sans-serif}main{max-width:960px;margin:auto;padding:38px 24px}h1{font-size:30px;margin:0 0 12px}p{max-width:800px}.stage{display:flex;gap:36px;align-items:center;background:white;border-radius:20px;padding:32px;margin:26px 0}.screen{width:384px;max-width:100%;flex-shrink:0;aspect-ratio:4/3;background:#08090e;border-radius:20px;overflow:hidden}svg{width:100%;height:100%;display:block}.round{aspect-ratio:1;border-radius:50%;width:320px}.round svg{height:100%}button{font:inherit;border:1px solid #d4ceda;border-radius:8px;background:white;padding:8px 15px;margin:4px;cursor:pointer}button[aria-pressed=true]{background:#e6def9;border-color:#9d87c5}.small{font-size:13px;color:#6d6778}li{margin:8px 0}@media(max-width:700px){.stage{flex-direction:column;padding:22px}.screen{width:320px}main{padding:24px 16px}}main{padding:0;max-width:none}main>h1,main>p,main>h2,main>ul,.stage>div+div,#modes{display:none}.stage{padding:0;margin:0;border-radius:16px;background:#08090e}.screen{width:100%;border-radius:16px}body{background:#08090e}</style></head>
+<body><main><h1>v5 · 大眼与离线表情预览</h1><p>沿用视频里的饱和紫胶囊眼与带停顿的动作，用视线方向、眼形和节奏区分空闲、思考、执行、等待、完成与异常。</p><p class="small">已确认 v5：在已烧录 v4 上再放大 20%，思考气泡移到外上侧；补充离线表情。本页为正式固件设计基准。按钮可对比设备上的 v4 尺寸。</p>
+<div id="modes"><button data-mode="idle" aria-pressed="true">空闲</button><button data-mode="thinking" aria-pressed="false">思考</button><button data-mode="running" aria-pressed="false">执行</button><button data-mode="waiting" aria-pressed="false">等待</button><button data-mode="done" aria-pressed="false">完成</button><button data-mode="error" aria-pressed="false">异常</button><button data-mode="offline" aria-pressed="false">离线</button></div>
+<div class="stage"><div class="screen" id="screen"><svg viewBox="0 0 320 240" role="img" aria-label="实时动态双眼表情"><g id="eyes" fill="#42695a"><rect id="left"/><rect id="right"/></g><g id="happy" stroke="#42695a" stroke-width="8" fill="none" stroke-linecap="round"><path id="happyL"/><path id="happyR"/></g><g id="failed" stroke="#b51f32" stroke-width="6" fill="none" stroke-linecap="round"><path d="M111 92 L133 114 M133 92 L111 114 M187 92 L209 114 M209 92 L187 114"/></g><g id="thought" fill="#42695a"><circle cx="218" cy="62" r="2"/><circle cx="229" cy="52" r="3"/></g><g id="writing"><g id="ink" fill="none" stroke="#42695a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path id="line0"/></g><g id="pen"><path d="M0 0 L3 -10 L15 -29 Q17 -32 20 -30 L22 -28 Q24 -26 22 -23 L10 -5 Z" fill="#42695a"/><path d="M0 0 L3 -10 L10 -5 Z" fill="#f0e7dc"/><path d="M0 0 L2 -5 L5 -2 Z" fill="#8d7dac"/><path d="M14 -27 L21 -22" stroke="#827494" stroke-width="2"/><path d="M6 -12 L16 -26" stroke="#f5efff" stroke-width="1.4" stroke-linecap="round"/></g></g><circle id="attention" cx="160" cy="174" r="3" fill="#e89820"/><g id="offlineFace" fill="none" stroke="#808080" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><g id="plugEye"><rect x="102" y="78" width="29" height="58" rx="14.5" fill="#808080" stroke="none"/><path d="M129 95 H141 M129 119 H141" stroke-width="5"/></g><g id="socketEye"><rect x="189" y="78" width="29" height="58" rx="14.5" fill="#808080" stroke="none"/><path d="M199 97 V103 M208 111 V117" stroke="#08090e" stroke-width="4"/></g><g id="disconnected"><path d="M120 177 H140 L148 172 L155 184 L163 163 L171 181 L178 177 H200"/><circle id="ecgPulse" cx="120" cy="177" r="2.5" fill="#b0b0b0" stroke="none"/></g></g></svg></div><div><strong id="label">空闲</strong><p id="description"></p><p class="small" id="timing"></p><button id="size" aria-pressed="true">对比已烧录 v4</button><button id="pause">暂停动画</button><button id="shape">查看圆屏构图</button><p class="small">按当前设备 320×240 横屏设计；圆形仅用于与参考视频比较。</p></div></div>
+<h2>本轮尺寸与间距</h2><ul><li><strong>尺寸：</strong>空闲眼睛从约 24.7 × 55.9 px 增至 29.6 × 67.1 px；保持双眼间距，避免整体拥挤。</li><li><strong>气泡：</strong>向外移动 34 px、向上移动 15 px；左右水平镜像，给眼睛上看留出空间。</li><li><strong>离线：</strong>插头与插座分别化作两只中性灰胶囊眼，保留眼睛的大小与构图；下方心电图作为嘴巴，光点缓慢沿折线扫过。</li><li><strong>空闲：</strong>以静止为主，偶尔向一侧看，再回到中心。没有工作标记。</li><li><strong>思考：</strong>放大眼睛并拉开高矮对比，左右上看幅度从 12 px 增至 23 px；停留时轻微回探再看回上方，让思考更鲜明。</li><li><strong>执行：</strong>双眼对称、略短，视线偏下；小笔放大约 15%，只写一行；眼睛与笔尖共用书写轨迹，横向跟随幅度从约 20 px 增至约 49 px；写完笔迹消失，眼睛交替看向左上或右上，再回正重写。</li><li><strong>等待：</strong>琥珀色眼睛睁大，左右张望，各自停留，像在等人回应。下方单点缓慢明暗变化，温和提醒需要回应。</li><li><strong>完成：</strong>进入时笑眼轻抬一次，随后左眼眨一下、右眼保持笑眼，再保持双眼笑眼，不回到空闲、不重复庆祝。</li><li><strong>异常：</strong>深红 xx 眼睛，进入时轻轻左右摇一次，随后稳定保持，避免反复抖动或闪烁。</li></ul><p class="small">状态切换用约 200–350 ms 的缓动与形状交替。默认自然眨眼；完成眨眼后保持笑眼，异常 xx 保持识别形状。暂停时切换状态会展示该状态的静态关键帧。支持系统“减少动态效果”设置。</p></main>
+<script>
+const $=id=>document.getElementById(id);
+const specs={
+ offline:['离线','左眼是圆润的双脚插头，右眼是带插孔的胶囊插座，保持双眼的轮廓与间距。下方心电图缓慢扫过，表示设备仍在等待连接。','中性灰插头眼与插座眼 · 心电图扫描周期 3.2 秒'],
+ idle:['空闲','安静观察。偶尔看向一侧，停留后回正，以静止和自然眨眼为主。','观察周期 7.2 秒 · 位移 8 px · 眨眼约 180 ms'],
+ thinking:['思考','先看右上方，停留后回正；再看左上方并停留。眼形随方向互换，像在比较两个想法。','v5：比 v4 再大 20% · 左右位移 23 px · 增加轻微回探'],
+ running:['执行','眼睛跟着笔从左向右写一行。写完笔迹消失，抬眼看向一侧上方，再回正，开始新的一行；每轮交替抬眼方向。','调整稿：笔尖与视线同步 · 约 49 px 横向跟随 · 抬眼更明显'],
+ waiting:['等待','睁大琥珀色双眼，先向左看，再向右看，各停留片刻；像在寻找回应，与空闲的偶尔侧看明显区分。','张望周期 4.8 秒 · 左右移动 16 px · 各停留约 1 秒'],
+ done:['完成','笑眼轻抬后，左眼闭合再张开，右眼保持笑眼，完成一次单眼眨眼，然后持续保持双眼笑眼。','轻抬 600 ms · 随后左眼眨眼 280 ms · 不自动退回空闲'],
+ error:['异常','xx 眼睛进入时轻摇一次，随后保持稳定，明确表达出现问题。','入场轻摇约 550 ms · 振幅不超过 4 px · 随后静止']
+};
+let enlarged=true; // true: v5; false: flashed v4
+let mode='idle',clock=0,last=0,paused=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let pose={x:0,y:0,left:43,right:43,w:19,gap:76,happy:0,failed:0,work:0,thought:0,attention:0,amber:0};
+const ease=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)};
+function track(t,keys){t%=keys.at(-1)[0];for(let i=1;i<keys.length;i++)if(t<=keys[i][0]){const a=keys[i-1],b=keys[i],u=ease((t-a[0])/(b[0]-a[0]));return a[1]+(b[1]-a[1])*u;}return keys[0][1]}
+function targetAt(t){const q={x:0,y:0,left:43,right:43,w:19,gap:76,happy:0,failed:0,work:0,thought:0,attention:0,amber:0};
+ if(mode==='idle'){q.x=track(t,[[0,0],[1.8,0],[2.2,8],[3.4,8],[3.9,0],[7.2,0]]);q.y=-2;}
+ if(mode==='thinking'){const look=track(t,[[0,0],[.6,1],[2.4,1],[3,0],[3.5,0],[4.1,-1],[5.9,-1],[6.5,0],[8,0]]);q.x=12*look;q.y=-3-10*Math.abs(look);q.left=39+6*look;q.right=39-6*look;q.thought=1;}
+ if(mode==='running'){const c=writingPhase(t),side=Math.floor(t/WRITE_PERIOD)%2===0?-1:1;q.work=1;q.gap=70;if(c<2){q.x=-10+20*c/2;q.y=10;q.left=q.right=32;}else{q.x=track(c,[[0,10],[2,10],[2.5,0],[2.95,side*12],[3.85,side*12],[4.5,0],[5.6,0]]);q.y=track(c,[[0,10],[2,10],[2.5,0],[2.95,-13],[3.85,-13],[4.5,0],[5.6,0]]);q.left=q.right=40;}}
+ if(mode==='waiting'){q.x=track(t,[[0,0],[.5,-16],[1.5,-16],[2.3,16],[3.3,16],[3.9,0],[4.8,0]]);q.y=-2;q.left=q.right=49;q.w=21;q.attention=1;q.amber=1;}
+ if(mode==='done'){q.happy=1;q.y=t<.6?-4*Math.sin(t/.6*Math.PI):0;}
+ if(mode==='error'){q.failed=1;q.x=t<.55?4*Math.sin(t/.55*Math.PI*4)*(1-t/.55):0;}
+ { // Both comparisons use v4 choreography
+   q.w*=1.3;q.left*=1.3;q.right*=1.3;q.gap*=1.15;
+   if(mode==='thinking'){
+     const look=track(t,[[0,0],[.45,1],[1.1,1],[1.3,.85],[1.5,1],[2.4,1],[2.95,0],[3.5,0],[3.95,-1],[4.6,-1],[4.8,-.85],[5,-1],[5.9,-1],[6.45,0],[8,0]]);
+     q.x=23*look;q.y=-4-18*Math.abs(look);q.left=(40+10*look)*1.3;q.right=(40-10*look)*1.3;
+   }
+   if(mode==='running'){
+     const c=writingPhase(t),side=Math.floor(t/WRITE_PERIOD)%2===0?-1:1;
+     if(c<2){const point=writtenPoint(c);q.x=(point.tip[0]-156)*.95;q.y=12+(point.tip[1]-178)*.7;q.left=q.right=44;q.gap=82;}
+     else{q.x=track(c,[[0,24.7],[2,24.7],[2.45,0],[2.9,side*23],[3.85,side*23],[4.45,0],[5.6,0]]);q.y=track(c,[[0,12],[2,12],[2.45,0],[2.9,-21],[3.85,-21],[4.45,0],[5.6,0]]);q.left=q.right=54;}
+   }
+ }
+ if(enlarged){q.w*=1.2;q.left*=1.2;q.right*=1.2;}
+ if(mode==='offline'){q.left=q.right=14*(enlarged?1.2:1);q.y=5;}
+ return q;
+}
+const WRITE_PERIOD=5.6-2+2/1.2;
+function writingPhase(t){const c=t%WRITE_PERIOD;return c<2/1.2?c*1.2:c+2-2/1.2;}
+function writtenPoint(cycle){const ps=[[130,180],[137,177],[141,181],[148,176],[154,180],[160,176],[166,179],[174,177],[182,179]];
+ const progress=Math.min(1,cycle/2)*(ps.length-1),i=Math.min(ps.length-2,Math.floor(progress)),v=progress-i;
+ const tip=[ps[i][0]+(ps[i+1][0]-ps[i][0])*v,ps[i][1]+(ps[i+1][1]-ps[i][1])*v];
+ return {tip,d:'M'+ps.slice(0,i+1).map(p=>p.join(' ')).join(' L')+' L'+tip.join(' ')};}
+function draw(dt,snap=false){const t=clock,q=targetAt(t),k=snap?1:1-Math.exp(-dt*12);for(const key in pose)pose[key]+=(q[key]-pose[key])*k;
+ let blink=1;const phase=t%5.7;if(!['done','error','offline'].includes(mode)&&phase>5.2&&phase<5.38)blink=Math.abs((phase-5.29)/.09);
+ const color=pose.amber; $('eyes').setAttribute('fill',`rgb(${66+166*color},${105+47*color},${90-58*color})`);
+ for(const [id,side,hh] of [['left',-1,pose.left],['right',1,pose.right]]){const h=Math.max(4,hh*blink),eye=$(id);eye.setAttribute('x',160+side*pose.gap/2+pose.x-pose.w/2);eye.setAttribute('y',103+pose.y-h/2);eye.setAttribute('width',pose.w);eye.setAttribute('height',h);eye.setAttribute('rx',Math.min(h,pose.w)/2);eye.setAttribute('opacity',Math.max(0,1-pose.happy-pose.failed));}
+ const doneBlink=mode==='done'&&t>=.85&&t<=1.13?Math.sin((t-.85)/.28*Math.PI):0;
+ for(const [id,side] of [['happyL',-1],['happyR',1]]){const size=1.25*(enlarged?1.2:1),x=160+side*38*1.15;$(id).setAttribute('d',`M${x-15*size} 108 Q${x} ${108-30*size+30*size*(side===-1?doneBlink:0)} ${x+15*size} 108`);}
+ $('happy').setAttribute('opacity',pose.happy);$('happy').setAttribute('transform',`translate(0 ${pose.y})`);
+ $('failed').setAttribute('opacity',pose.failed);$('failed').setAttribute('transform',`translate(${160+pose.x} 103) scale(${1.25*(enlarged?1.2:1)}) translate(-160 -103)`);
+ $('thought').setAttribute('opacity',pose.thought*(.35+.65*Math.min(1,Math.abs(pose.x)/12)));$('thought').setAttribute('transform',(pose.x<0?'translate(320 0) scale(-1 1) ':'')+(enlarged?'translate(48 -25)':'translate(14 -10)'));
+ $('attention').setAttribute('opacity',pose.attention*(.35+.65*(1-Math.cos(t*2*Math.PI/3.6))/2));
+ $('disconnected').setAttribute('opacity',mode==='offline'?(.4+.6*(1-Math.cos(t*2*Math.PI/3.2))/2):0);
+ $('offlineFace').setAttribute('opacity',mode==='offline'?1:0);
+ if(mode==='offline'){$('left').setAttribute('opacity',0);$('right').setAttribute('opacity',0);}
+ const ecg=[[120,177],[140,177],[148,172],[155,184],[163,163],[171,181],[178,177],[200,177]];
+ const lengths=ecg.slice(1).map((p,i)=>Math.hypot(p[0]-ecg[i][0],p[1]-ecg[i][1]));
+ let distance=(t%3.2)/3.2*lengths.reduce((a,b)=>a+b,0);
+ for(let j=0;j<lengths.length;j++){if(distance<=lengths[j]){const u=distance/lengths[j];$('ecgPulse').setAttribute('cx',ecg[j][0]+u*(ecg[j+1][0]-ecg[j][0]));$('ecgPulse').setAttribute('cy',ecg[j][1]+u*(ecg[j+1][1]-ecg[j][1]));break;}distance-=lengths[j];} 
+ const cycle=writingPhase(t),ps=[[130,180],[137,177],[141,181],[148,176],[154,180],[160,176],[166,179],[174,177],[182,179]];
+ const progress=Math.min(1,cycle/2)*(ps.length-1),i=Math.min(ps.length-2,Math.floor(progress)),v=progress-i;
+ let tip=[ps[i][0]+(ps[i+1][0]-ps[i][0])*v,ps[i][1]+(ps[i+1][1]-ps[i][1])*v];
+ $('line0').setAttribute('d','M'+ps.slice(0,i+1).map(p=>p.join(' ')).join(' L')+' L'+tip.join(' '));
+ const clear=1-ease((cycle-2.1)/.3);
+ $('writing').setAttribute('opacity',pose.work);$('ink').setAttribute('opacity',cycle===0?0:clear);
+ let penOpacity=1;
+ if(cycle>=2){tip[1]-=8*ease((cycle-2)/.3);penOpacity=1-ease((cycle-2.1)/.3);}
+ if(cycle>=4.8){tip=[130,180-8*(1-ease((cycle-4.8)/.6))];penOpacity=ease((cycle-4.8)/.6);}
+ $('pen').setAttribute('opacity',penOpacity);$('pen').setAttribute('transform',`translate(${tip[0]} ${tip[1]}) scale(${1.15})`);
+
+
+}
+function setMode(m){mode=m;clock=0;$('label').textContent=specs[m][0];$('description').textContent=specs[m][1];$('timing').textContent=specs[m][2];document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===m)));$('screen').querySelector('svg').setAttribute('aria-label',specs[m][0]+'动态表情');if(paused)draw(0,true);}
+function pauseLabel(){$('pause').textContent=paused?'播放动画':'暂停动画';}
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$('pause').onclick=()=>{paused=!paused;pauseLabel()};
+$('size').onclick=()=>{enlarged=!enlarged;$('size').textContent=enlarged?'对比已烧录 v4':'查看 v5 再放大 20%';$('size').setAttribute('aria-pressed',String(enlarged));if(paused)draw(0,true);};
+$('shape').onclick=()=>{const round=$('screen').classList.toggle('round');$('shape').textContent=round?'查看横屏构图':'查看圆屏构图'};
+function frame(ms){const dt=last?Math.min((ms-last)/1000,.05):0;last=ms;if(!paused){clock+=dt;draw(dt);}requestAnimationFrame(frame)}
+setMode(mode);draw(0,true);pauseLabel();requestAnimationFrame(frame);
+window.addEventListener('message',e=>{if(e.data?.type==='review-state' && specs[e.data.state])setMode(e.data.state);if(e.data?.type==='review-pause'){paused=e.data.paused;pauseLabel();}});
+</script></body></html>

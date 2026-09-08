@@ -13,6 +13,7 @@ export type BridgeServerConfig = {
   statusPath: string;
   bridgeSource: string;
   sourceIntervalMs?: number;
+  heartbeatMs?: number;
 };
 
 export type BridgeServer = {
@@ -29,8 +30,21 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
   let latestAgentEventMessage: AgentEventMessage | undefined;
   const server = createHealthServer(config, clients, () => latestAgentEventMessage);
   const wss = new WebSocketServer({ server, path: config.statusPath });
+  const alive = new WeakMap<WebSocket, boolean>();
+  const heartbeat = setInterval(() => {
+    for (const client of clients) {
+      if (!alive.get(client)) { client.terminate(); continue; }
+      alive.set(client, false);
+      client.ping();
+    }
+  }, config.heartbeatMs ?? 30000);
+  heartbeat.unref();
+  wss.on("close", () => clearInterval(heartbeat));
 
   wss.on("connection", (client) => {
+    alive.set(client, true);
+    client.on("pong", () => alive.set(client, true));
+    client.on("error", () => client.terminate());
     clients.add(client);
     resolveClientWaiters(clientWaiters);
     send(
@@ -64,12 +78,19 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
       }
     },
     close(onClosed) {
+      clearInterval(heartbeat);
+      // A peer with a broken network must not hold shutdown indefinitely.
+      const forceClose = setTimeout(() => {
+        for (const client of clients) client.terminate();
+        server.closeAllConnections();
+      }, 2000);
+      forceClose.unref();
       for (const client of clients) {
         client.close(1001, "bridge shutting down");
       }
 
       wss.close(() => {
-        server.close(() => onClosed?.());
+        server.close(() => { clearTimeout(forceClose); onClosed?.(); });
       });
     },
     getClientCount() {
@@ -114,6 +135,8 @@ function createHealthServer(
           service: "agent-indicator-bridge",
           source: config.bridgeSource,
           clients: clients.size,
+          uptimeSeconds: Math.floor(process.uptime()),
+          memory: { rss: process.memoryUsage().rss, heapUsed: process.memoryUsage().heapUsed },
           latestAgentEvent: latestAgentEventMessage?.event,
         }),
       );

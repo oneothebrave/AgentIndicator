@@ -4,11 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "node scripts/indicator.mjs",
+    "doctor": "node scripts/indicator.mjs --check",
+    "session:reset": "node scripts/indicator.mjs --reset-session",
+    "stability": "node scripts/stability.mjs",
     "dev": "vite --host 127.0.0.1",
     "bridge": "tsx server/index.ts",
     "bridge:mock": "tsx server/index.ts",
     "bridge:codex": "tsx server/index.ts",
-    "test": "node --import tsx --test server/sources/codex/events.test.ts",
+    "bridge:cli": "tsx server/cli.ts",
+    "hooks:install": "node scripts/install-codex-hooks.mjs",
+    "test": "node --import tsx --test server/statusBroadcaster.test.ts server/sources/codex/events.test.ts server/sources/hooks/*.test.ts scripts/indicator.test.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },
