@@ -49,7 +49,7 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 ```powershell
 $env:AGENT_INDICATOR_HOST = "0.0.0.0"
 $env:AGENT_INDICATOR_SOURCE = "mock"
-npm run bridge:mock
+npm run dev:mock
 ```
 
 固件默认显示浅紫胶囊眼动态表情和底部连接点，隐藏状态文字。点击屏幕切换调试页，查看连接状态、Agent 状态、事件类型、来源和计数，再次点击返回表情。Wi-Fi 每 15 秒重试，WebSocket 每 3 秒重连，并使用 WebSocket ping/pong 检测断线；不会因 Agent 沉默而推断网络已断开。断线显示连接中的表情，调试页显示 Offline，收到有效 `bridge.hello` 后才接收事件。
@@ -80,7 +80,7 @@ $env:AGENT_INDICATOR_HOST = "0.0.0.0"
 $env:AGENT_INDICATOR_SOURCE = "codex"
 $env:AGENT_INDICATOR_CODEX_SANDBOX = "read-only"
 $env:AGENT_INDICATOR_CODEX_PROMPT = "请执行一次只读命令，读取当前目录的 package.json，然后用一句中文概括这个项目的用途。"
-npm run bridge:codex
+npm run dev:app-server
 ```
 
 此命令通过 app-server 发起一次真实任务；不是监听 Codex Desktop 中任意正在进行的任务。任务完成后，屏幕保留最后的 done 状态。首次联调若在沙箱内遇到 TLS 错误，需在获准的沙箱外进程运行 bridge。

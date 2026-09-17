@@ -68,14 +68,14 @@ Codex / CLI / other agent
 
 当前 mock bridge 已提供：
 
-- `npm run bridge:mock` 通过 `server/index.ts` 启动本地 WebSocket 服务。`server/sources/statusSource.ts` 保留为 source 合同定义。
+- `npm run dev:mock` 通过 `server/index.ts` 启动本地 WebSocket 服务。`server/sources/statusSource.ts` 保留为 source 合同定义。
 - `ws://127.0.0.1:8787/status` 推送 `bridge.hello` 和 `agent.event`。
 - `http://127.0.0.1:8787/health` 返回服务健康状态。
 - 浏览器前端固定连接 bridge，不提供 URL 输入框或启停开关。
 
 当前 Codex app-server bridge 已提供：
 
-- `npm run bridge:codex` 通过 `server/index.ts` 启动本地 WebSocket 服务，并默认选择 `codex` source。
+- `npm run dev:app-server` 通过 `server/index.ts` 启动本地 WebSocket 服务，通过 `--source=codex` 显式选择 app-server source。
 - `server/sources/codexSource.ts` 启动 `codex app-server --stdio`，完成 `initialize` / `initialized` 握手。
 - 设置 `AGENT_INDICATOR_CODEX_PROMPT` 后，bridge 会创建临时 Codex thread 并调用 `turn/start`，再把 app-server 推送的 `turn/*`、`item/*`、`thread/status/changed` 等事件映射成统一 `AgentEvent`。
 - 未设置 `AGENT_INDICATOR_CODEX_PROMPT` 时，只连接 app-server，不主动发起真实 Codex turn，避免无意消耗模型调用或改动工作区。
@@ -84,7 +84,7 @@ PowerShell 示例：
 
 ```powershell
 $env:AGENT_INDICATOR_CODEX_PROMPT = "只读检查当前项目结构，并用一句话总结。不要修改文件。"
-npm run bridge:codex
+npm run dev:app-server
 ```
 
 可选环境变量：
@@ -122,10 +122,10 @@ npm run bridge:codex
 
 ```powershell
 $env:AGENT_INDICATOR_HOST = "0.0.0.0"
-npm run bridge:mock
+npm run dev:mock
 ```
 
-电脑和设备连接同一可互访局域网，设备填写电脑的局域网 IP（不能填写 `127.0.0.1` 或 `0.0.0.0`）。如 Windows 防火墙阻止连接，为专用网络放行 bridge 的 TCP 8787 端口。先用现有 mock source 验证硬件事件显示，再切换 `bridge:codex` 验证真实事件。
+电脑和设备连接同一可互访局域网，设备填写电脑的局域网 IP（不能填写 `127.0.0.1` 或 `0.0.0.0`）。如 Windows 防火墙阻止连接，为专用网络放行 bridge 的 TCP 8787 端口。先用现有 mock source 验证硬件事件显示，再切换 `dev:app-server` 验证真实事件。
 
 ## 后续完善 / Backlog
 
@@ -135,7 +135,7 @@ npm run bridge:mock
 
 2026-09-07 验证：29 项自动化测试通过，TypeScript 检查和生产构建通过。已用 `npm start` 替换旧的前台 bridge，观察客户端数量从 0 恢复为 1；`npm run doctor` 正常。未修改硬件固件。
 
-日常交互式 CLI 接入已增加 `codex-hooks` source：使用 `npm run bridge:cli` 和普通 `codex`，无需测试 prompt。具体安装、会话绑定和限制见 [CLI hooks 接入](cli-hooks.md)。已完成真实 CLI 多轮命令、文件修改、中断、退出及硬件目视验收。真实审批与长期运行仍待验证。
+日常交互式 CLI 接入已增加 `codex-hooks` source：使用 `npm start` 和普通 `codex`，无需测试 prompt。具体安装、会话绑定和限制见 [CLI hooks 接入](cli-hooks.md)。已完成真实 CLI 多轮命令、文件修改、中断、退出及硬件目视验收。真实审批与长期运行仍待验证。
 
 事件诊断维护项（2026-09-09 已完成）：
 

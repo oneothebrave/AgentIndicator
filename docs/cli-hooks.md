@@ -18,9 +18,9 @@ cd E:\AgentIndicator
 codex
 ```
 
-直接在 CLI 中输入问题、执行命令和修改文件，StackChan 会跟随状态变化。无需 `AGENT_INDICATOR_CODEX_PROMPT`。`bridge:cli` 强制选择 `codex-hooks`，因此旧的 `AGENT_INDICATOR_SOURCE=codex` 不会误启动 app-server 测试任务。它默认监听 `0.0.0.0:8787`；如设置了 `AGENT_INDICATOR_HOST`，则使用该值。
+直接在 CLI 中输入问题、执行命令和修改文件，StackChan 会跟随状态变化。无需 `AGENT_INDICATOR_CODEX_PROMPT`。`npm start` 强制选择 `codex-hooks`，因此旧的 `AGENT_INDICATOR_SOURCE=codex` 不会误启动 app-server 测试任务。它默认监听 `0.0.0.0:8787`；如设置了 `AGENT_INDICATOR_HOST`，则使用该值。
 
-`npm start` 会检查端口、hooks 配置和局域网地址；若 CLI bridge 的两个健康检查均正常，则复用现有服务并退出，不创建第二个实例。新启动时保持前台运行，连接数量变化会打印诊断，按 Ctrl+C 停止。底层 `npm run bridge:cli` 仍可使用。
+`npm start` 会检查端口、hooks 配置和局域网地址；若 CLI bridge 的两个健康检查均正常，则复用现有服务并退出，不创建第二个实例。新启动时保持前台运行，连接数量变化会打印诊断，按 Ctrl+C 停止。日常使用统一通过此入口启动。
 
 同一端口只能运行一个 bridge。若端口被 mock、app-server 或其他服务占用，启动器会说明冲突并返回失败，不结束占用进程；请在旧 bridge 的终端按 Ctrl+C 后再启动。硬件仍连接 `ws://<电脑局域网IP>:8787/status`，无需重新烧录。
 
@@ -153,3 +153,19 @@ sender 只发送事件身份、会话/轮次、工具名/调用 ID、可选子�
 明确的终止失败可以修正仍属于当前轮的 Stop 完成状态，不能覆盖中断或新轮。发送器观察时间用于拒绝已知更早的 prompt，重复 prompt 不会清空活动工具；它不提供跨进程启动的严格全序。CLI 无 SessionEnd 的突然消失仍使用 `npm run session:reset`，不猜测其他终端或 Desktop 的归属。
 
 默认关闭逐事件日志。调试时在启动 bridge 的终端设置 `$env:AGENT_INDICATOR_DEBUG_EVENTS='1'`；只记录方法名、事件类型与关联标识，不打印原始 payload。`npm run events:capture -- 60` 只读采集 60 秒 WebSocket 状态到 `.tmp/events/`，不记录 detail、prompt 或命令原文。采集器本身算一个 WebSocket 客户端。
+
+## npm 命令分类
+
+| 场景 | 命令 | 说明 |
+| --- | --- | --- |
+| 日常使用 | `npm start` | 启动或复用 CLI hooks bridge；另开终端运行 `codex` |
+| 排障与恢复 | `npm run doctor`、`npm run session:reset` | 查看健康状态或释放当前会话 |
+| 安装配置 | `npm run hooks:install` | 安装或更新 hooks |
+| 开发数据源 | `npm run dev:mock`、`npm run dev:app-server` | 模拟事件或独立 app-server 任务；不监听日常 CLI |
+| 前端模拟器 | `npm run dev`、`npm run preview` | 开发服务或构建产物预览 |
+| 检查与构建 | `npm test`、`npm run test:contract`、`npm run build` | 自动化测试、协议契约检查和构建 |
+| 采样与长测 | `npm run events:capture`、`npm run stability` | 事件采集和稳定性验证 |
+
+2026-09-17 清理了重复入口：原 `bridge` / `bridge:mock` 改用 `dev:mock`，原 `bridge:codex` 改用 `dev:app-server`，原 `bridge:cli` 改用 `npm start`。
+开发命令通过 `--source` 显式选择来源，优先于 `AGENT_INDICATOR_SOURCE`，不再依赖 npm 脚本名称。直接运行 `server/index.ts` 时仍可使用该环境变量，未指定时默认 mock。日常启动器保留内部 `server/cli.ts` 入口并固定使用 codex-hooks。
+开发 bridge 默认监听 `127.0.0.1`；需要硬件连接时设置 `AGENT_INDICATOR_HOST=0.0.0.0`。切换来源前停止占用同一端口的旧服务。
