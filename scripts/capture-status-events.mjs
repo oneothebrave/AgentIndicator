@@ -2,15 +2,17 @@ import { WebSocket } from "ws";
 import { mkdirSync, appendFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { bridgeSettings } from "./indicator.mjs";
 
 const seconds = Number(process.argv[2] ?? 60);
-const port = Number(process.env.AGENT_INDICATOR_PORT ?? 8787);
-if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600 || !Number.isInteger(port) || port < 1 || port > 65535)
+const { port, probeHost } = bridgeSettings();
+if (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600)
   throw new Error("Usage: npm run events:capture -- <seconds 1–3600>");
 const directory = fileURLToPath(new URL("../.tmp/events/", import.meta.url));
 mkdirSync(directory, { recursive: true });
 const path = join(directory, `${new Date().toISOString().replaceAll(":", "-")}.jsonl`);
-const ws = new WebSocket(`ws://127.0.0.1:${port}/status`, { maxPayload: 65536 });
+const host = probeHost.includes(":") ? `[${probeHost}]` : probeHost;
+const ws = new WebSocket(`ws://${host}:${port}/status`, { maxPayload: 65536 });
 let count = 0, finished = false;
 function finish(reason) {
   if (finished) return;

@@ -37,8 +37,8 @@ export function createCodexHooksSource(port = Number(process.env.AGENT_INDICATOR
           try {
             if (req.url === "/session/reset") {
               const value = JSON.parse(body);
-              if (!value || !(value.expectedSessionId === null || typeof value.expectedSessionId === "string")) { res.writeHead(400).end("{}"); return; }
-              const reset = publisher.reset(value.expectedSessionId);
+              if (!value || ![value.expectedSessionId, value.expectedTurnId].every(v => v === null || typeof v === "string")) { res.writeHead(400).end("{}"); return; }
+              const reset = publisher.reset(value.expectedSessionId, value.expectedTurnId);
               res.writeHead(reset ? 200 : 409).end(JSON.stringify({ reset }));
               return;
             }

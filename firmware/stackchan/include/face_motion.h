@@ -49,6 +49,8 @@ inline Pose target(const char* state,float t) {
   } else if(!strcmp(state,"waiting")) { const Key k[]={{0,0},{.5f,-16},{1.5f,-16},{2.3f,16},{3.3f,16},{3.9f,0},{4.8f,0}};q.x=track(t,k);q.y=-2;q.left=q.right=76.44f;q.w=32.76f;q.attention=q.amber=1; }
   else if(!strcmp(state,"done")) {q.happy=1;q.y=t<.6f?-4*sinf(t/.6f*3.14159265358979323846f):0;}
   else if(!strcmp(state,"error")) {q.failed=1;q.x=t<.55f?4*sinf(t/.55f*3.14159265358979323846f*4)*(1-t/.55f):0;}
+  // This pose only seeds smoothing when reconnecting. Offline eye geometry is
+  // drawn independently by FaceRenderer::offline(), not from these dimensions.
   else if(!strcmp(state,"offline")) q.left=q.right=21.84f;
   return q;
 }

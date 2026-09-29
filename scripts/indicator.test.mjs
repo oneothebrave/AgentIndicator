@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import { WebSocket } from "ws";
-import { settings, health, canBind, inspect } from "./indicator.mjs";
+import { bridgeSettings, settings, health, canBind, inspect, createDiagnosticReporter } from "./indicator.mjs";
 
 async function listener(handler) {
   const server = createServer(handler);
@@ -37,6 +37,25 @@ async function until(fn) {
 test("reject invalid and colliding port configuration", () => {
   for (const port of ["0", "-1", "abc", "65536", "1.5", "8788"])
     assert.throws(() => settings({ AGENT_INDICATOR_PORT: port }));
+});
+
+test("read-only bridge consumers do not depend on a hooks listener configuration", () => {
+  assert.equal(bridgeSettings({ AGENT_INDICATOR_PORT: "8788", AGENT_INDICATOR_HOOK_PORT: "invalid" }).port, 8788);
+});
+
+test("diagnostics report observer degradation and recovery without timestamp spam", () => {
+  const printed = [];
+  const report = createDiagnosticReporter(s => printed.push(s.hooks.terminalObserver.phase));
+  const status = (phase, error = null, lastReadAt = 0) => ({ bridgeOK: true, hooksOK: true, bridge: { clients: 1 },
+    hooks: { terminalObserver: { phase, error, lastReadAt } } });
+  report(status("reading"));
+  report(status("reading", null, 100));
+  report(status("missing"));
+  report(status("ambiguous"));
+  report(status("error", "EACCES"));
+  report(status("error", "ENOENT"));
+  report(status("reading", null, 200));
+  assert.deepEqual(printed, ["reading", "missing", "ambiguous", "error", "error", "reading"]);
 });
 
 test("health bounds stalled responses and detects occupied ports", async () => {
@@ -81,8 +100,12 @@ test("fresh startup, reuse, doctor, websocket reconnect and hook delivery", { ti
     assert.equal((await inspect(config)).bridge.latestAgentEvent.type, "turn.started");
     const rejected = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json", origin: "http://example.test" }, body: JSON.stringify({ expectedSessionId: "test-session" }) });
     assert.equal(rejected.status, 403);
-    const stale = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedSessionId: "stale" }) });
+    const stale = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedSessionId: "stale", expectedTurnId: "test-turn" }) });
     assert.equal(stale.status, 409);
+    const oldTurn = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedSessionId: "test-session", expectedTurnId: "old-turn" }) });
+    assert.equal(oldTurn.status, 409);
+    const missingTurn = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedSessionId: "test-session" }) });
+    assert.equal(missingTurn.status, 400);
     const reset = child(config, "--reset-session");
     assert.equal((await reset.ended)[0], 0, reset.output());
     assert.equal((await inspect(config)).hooks.sessionId, null);

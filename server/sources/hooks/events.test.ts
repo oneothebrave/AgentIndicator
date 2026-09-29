@@ -16,9 +16,9 @@ function setup() {
 test("manual reset rejects a stale target and prevents delayed turn rebinding", () => {
   const t = setup(); t.send("UserPromptSubmit");
   t.send("PreToolUse", { tool_name: "Bash", tool_use_id: "shell" });
-  assert.equal(t.publisher.reset("another-session"), false);
+  assert.equal(t.publisher.reset("another-session", "turn-a"), false);
   assert.equal(t.publisher.status().activeTools, 1);
-  assert.equal(t.publisher.reset("cli-a"), true);
+  assert.equal(t.publisher.reset("cli-a", "turn-a"), true);
   assert.equal(t.last(), "thread.idle");
   assert.equal(t.publisher.status().sessionId, null);
   assert.equal(t.send("PreToolUse", { tool_name: "Bash", tool_use_id: "delayed" }), false);
@@ -28,8 +28,26 @@ test("manual reset rejects a stale target and prevents delayed turn rebinding", 
 
 test("manual reset preserves an explicitly pinned session", () => {
   const publisher = createHookEventPublisher(() => {}, "pinned");
-  assert.equal(publisher.reset("pinned"), true);
+  assert.equal(publisher.reset("pinned", null), true);
   assert.equal(publisher.status().sessionId, "pinned");
+});
+
+test("a reset based on an older turn cannot clear a new turn in the same CLI", () => {
+  const t = setup(); t.send("UserPromptSubmit");
+  t.send("Stop");
+  t.send("UserPromptSubmit", { turn_id: "new-turn" });
+  t.send("PreToolUse", { turn_id: "new-turn", tool_name: "Bash", tool_use_id: "new-tool" });
+  assert.equal(t.publisher.reset("cli-a", "turn-a"), false);
+  assert.equal(t.publisher.status().activeTools, 1);
+  assert.equal(t.last(), "command.started");
+  assert.equal(t.publisher.reset("cli-a", "new-turn"), true);
+});
+
+test("retired SessionStart notifications from old installations are harmless", () => {
+  const t = setup(); t.send("UserPromptSubmit");
+  assert.equal(t.send("SessionStart", { turn_id: undefined }), false);
+  assert.equal(t.publisher.status().lastHook, "UserPromptSubmit");
+  assert.equal(t.last(), "turn.started");
 });
 test("ignores other sessions and stale turn events, accepts subsequent turns", () => {
   const t = setup();

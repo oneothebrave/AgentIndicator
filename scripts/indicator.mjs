@@ -7,13 +7,19 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-export function settings(env = process.env) {
+export function bridgeSettings(env = process.env) {
   const port = Number(env.AGENT_INDICATOR_PORT ?? 8787);
-  const hookPort = Number(env.AGENT_INDICATOR_HOOK_PORT ?? 8788);
-  if (![port, hookPort].every(p => Number.isInteger(p) && p > 0 && p <= 65535) || port === hookPort)
-    throw new Error("两个端口必须是不同的 1–65535 整数。");
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("bridge 端口必须是 1–65535 整数。");
   const host = env.AGENT_INDICATOR_HOST ?? "0.0.0.0";
-  return { port, hookPort, host, probeHost: host === "0.0.0.0" ? "127.0.0.1" : host === "::" ? "::1" : host };
+  return { port, host, probeHost: host === "0.0.0.0" ? "127.0.0.1" : host === "::" ? "::1" : host };
+}
+
+export function settings(env = process.env) {
+  const bridge = bridgeSettings(env);
+  const hookPort = Number(env.AGENT_INDICATOR_HOOK_PORT ?? 8788);
+  if (!Number.isInteger(hookPort) || hookPort < 1 || hookPort > 65535 || bridge.port === hookPort)
+    throw new Error("两个端口必须是不同的 1–65535 整数。");
+  return { ...bridge, hookPort };
 }
 
 // Bound response size and deadline, including a server that sends headers but stalls.
@@ -54,6 +60,19 @@ export async function inspect(config) {
   const bridgeOK = bridge?.ok === true && bridge.service === "agent-indicator-bridge" && bridge.source === "codex-cli-hooks";
   const hooksOK = hooks?.ok === true && hooks.source === "codex-cli-hooks";
   return { bridge, hooks, ready: bridgeOK && hooksOK, bridgeOK, hooksOK };
+}
+
+// Only meaningful diagnostics affect logging; polling timestamps are noise.
+export function createDiagnosticReporter(write = report) {
+  let previous;
+  return status => {
+    const observer = status.hooks?.terminalObserver;
+    const key = JSON.stringify([status.bridgeOK, status.hooksOK, status.bridge?.clients,
+      observer?.phase, observer?.error]);
+    if (key === previous) return;
+    previous = key;
+    write(status);
+  };
 }
 
 function report(status) {
@@ -103,7 +122,7 @@ export async function main(args = process.argv.slice(2)) {
     if (!status.ready) throw new Error("CLI bridge 不完整，无法释放会话。请先检查服务。");
     const response = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ expectedSessionId: status.hooks.sessionId }), signal: AbortSignal.timeout(1500),
+      body: JSON.stringify({ expectedSessionId: status.hooks.sessionId, expectedTurnId: status.hooks.turnId }), signal: AbortSignal.timeout(1500),
     });
     if (!response.ok) throw new Error("会话在检查后发生变化或释放失败，请重新运行 doctor。");
     console.log("[恢复] 已清除当前轮次并显示 idle。现在可在目标 CLI 输入新任务；固定会话配置仍生效。");
@@ -120,19 +139,19 @@ export async function main(args = process.argv.slice(2)) {
     console.error("如果运行的是 mock/app-server 或不完整的旧 bridge，请在其终端按 Ctrl+C，再运行 npm start。");
     return 1;
   }
-  try { await import("tsx/esm/api"); } catch { throw new Error("缺少项目依赖，请先在项目目录运行 npm install。"); }
+  let tsImport;
+  try { ({ tsImport } = await import("tsx/esm/api")); } catch { throw new Error("缺少项目依赖，请先在项目目录运行 npm install。"); }
   process.env.AGENT_INDICATOR_HOST = config.host;
   console.log("[启动] 启动 CLI bridge；此终端保持运行，Ctrl+C 停止。另一终端运行 codex。");
-  const { tsImport } = await import("tsx/esm/api");
   await tsImport(pathToFileURL(join(root, "server", "cli.ts")).href, import.meta.url);
-  let last = "", busy = false;
+  const reportChanges = createDiagnosticReporter();
+  let busy = false;
   const monitor = async () => {
     if (busy) return;
     busy = true;
     try {
       const next = await inspect(config);
-      const key = JSON.stringify([next.ready, next.bridge?.clients]);
-      if (key !== last) { report(next); last = key; }
+      reportChanges(next);
     } finally { busy = false; }
   };
   const timer = setInterval(() => { void monitor(); }, 3000);

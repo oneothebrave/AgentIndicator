@@ -10,3 +10,8 @@ test("firmware implements all and only the shared AgentEvent mappings", () => {
   assert.deepEqual(rows.map(r => r[0]).sort(), [...agentEventTypes].sort());
   for (const type of agentEventTypes) assert.equal(rows.find(r => r[0] === type)?.[1], mapEventToState({ id: "parity", at: 0, origin: "mock", type }, "idle"));
 });
+
+test("default firmware build selects the production status client", () => {
+  const ini = readFileSync(new URL("../firmware/stackchan/platformio.ini", import.meta.url), "utf8");
+  assert.match(ini, /\[platformio\]\s+default_envs\s*=\s*status-client\s/);
+});

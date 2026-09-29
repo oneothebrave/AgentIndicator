@@ -2,7 +2,7 @@
 
 ## 日常启动
 
-当前项目已在 Codex CLI 0.153.4 中安装并审核启用通知 hooks，包括 SubagentStart/SubagentStop。当前修复与测试结论见 [2026-09-09 验收](fix-validation-2026-09-09.md)。开两个终端：
+当前项目已在 Codex CLI 0.153.4 中安装并审核启用通知 hooks，包括 SubagentStart/SubagentStop。最近维护结果见 [2026-09-29 验收](fix-validation-2026-09-29.md)，实机验收记录见 [2026-09-09 验收](fix-validation-2026-09-09.md)。开两个终端：
 
 终端一（保持运行）：
 
@@ -169,3 +169,11 @@ sender 只发送事件身份、会话/轮次、工具名/调用 ID、可选子�
 2026-09-17 清理了重复入口：原 `bridge` / `bridge:mock` 改用 `dev:mock`，原 `bridge:codex` 改用 `dev:app-server`，原 `bridge:cli` 改用 `npm start`。
 开发命令通过 `--source` 显式选择来源，优先于 `AGENT_INDICATOR_SOURCE`，不再依赖 npm 脚本名称。直接运行 `server/index.ts` 时仍可使用该环境变量，未指定时默认 mock。日常启动器保留内部 `server/cli.ts` 入口并固定使用 codex-hooks。
 开发 bridge 默认监听 `127.0.0.1`；需要硬件连接时设置 `AGENT_INDICATOR_HOST=0.0.0.0`。切换来源前停止占用同一端口的旧服务。
+
+## 2026-09-29 维护说明
+
+- hooks 清单统一在 `shared/hook-events.json`；false 表示弃用注册。安装器会清理本项目旧 SessionStart 通知，其他 hooks 与匹配器保留。已打开的 CLI 如缓存旧配置，可在下一次正常启动时重新加载；旧 SessionStart 请求仍可识别并忽略。
+- `session:reset` 同时校验健康检查取得的 sessionId 和 turnId。期间如果同一 CLI 开始新一轮，返回冲突，不清除新任务。bridge 与启动脚本应一起更新；旧的仅含 expectedSessionId 的 HTTP 重置请求会被拒绝。
+- 持续诊断会报告终止错误监听器的失效与恢复，不因 lastReadAt 更新时间而反复刷屏。
+- `events:capture` 使用与启动器一致的 HOST / PORT 和探测地址：0.0.0.0 转 127.0.0.1，:: 转 ::1，具体网卡地址保持原值；支持 IPv6 URL。
+- 开发用 app-server 的启动错误/请求超时会明确停止该来源并显示 error，后续迟到事件不再改变表情；重新启动 bridge 才会重新连接。此 error 表示来源已停止，不能据此推断工具副作用已撤销或所有外部命令都被取消。普通 CLI hooks 接入不走这一错误路径。

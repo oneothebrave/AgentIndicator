@@ -1,0 +1,14 @@
+{
+  "SessionStart": false,
+  "SessionEnd": true,
+  "UserPromptSubmit": true,
+  "PreToolUse": true,
+  "PostToolUse": true,
+  "PermissionRequest": true,
+  "Stop": true,
+  "Interrupt": true,
+  "PreCompact": true,
+  "PostCompact": true,
+  "SubagentStart": true,
+  "SubagentStop": true
+}

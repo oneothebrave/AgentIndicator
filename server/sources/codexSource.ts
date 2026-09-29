@@ -19,57 +19,57 @@ export {
 export function createCodexSource(
   config: CodexSourceConfig = readCodexSourceConfigFromEnv(),
 ): StatusSource {
-  let client: CodexAppServerClient | undefined;
-  let stopping = false;
+  let run: { stop: () => void } | undefined;
 
   return {
     name: "codex-app-server",
     startPublishing(bridgeRuntime: StatusSourceBridgeRuntime) {
-      if (client) {
+      if (run) {
         return;
       }
 
-      stopping = false;
+      let active = true;
       const codexEvents = createCodexEventPublisher({
         config: config.events,
         sendStatusMessage: bridgeRuntime.sendStatusMessage,
       });
-      client = new CodexAppServerClient({
+      const stop = () => {
+        active = false;
+        client.stop();
+      };
+      const fail = (detail: string) => {
+        if (!active) return;
+        // A startup timeout doesn't prove the model failed. Stop this source
+        // explicitly, then report its failure once. No late events may revive it.
+        stop();
+        codexEvents.publishAgentEvent({ type: "turn.failed", label: "Error", detail: `Codex source stopped: ${detail}` });
+        console.error("[codex-source]", detail);
+      };
+      const client = new CodexAppServerClient({
         launch: config.launch,
         client: config.client,
         onNotification(notification) {
+          if (!active) return;
           codexEvents.publishNotificationFromCodex(notification);
         },
         onServerRequest(request) {
+          if (!active) throw new Error("Codex source stopped");
           codexEvents.publishServerRequestFromCodex(request);
           return resolveServerRequest(request);
         },
         onExit(exitDescription) {
-          if (stopping) {
-            return;
-          }
-
-          codexEvents.publishAgentEvent({
-            type: "turn.failed",
-            label: "Error",
-            detail: `codex app-server exited: ${exitDescription}`,
-          });
+          fail(`codex app-server exited: ${exitDescription}`);
         },
       });
 
-      void startWhenReady(bridgeRuntime, client, config).catch((error: unknown) => {
-        codexEvents.publishAgentEvent({
-          type: "turn.failed",
-          label: "Error",
-          detail: getErrorMessage(error, "Failed to start codex app-server"),
-        });
-        console.error("[codex-source]", error);
+      run = { stop };
+      void startWhenReady(bridgeRuntime, client, config, () => active).catch((error: unknown) => {
+        fail(getErrorMessage(error, "Failed to start codex app-server"));
       });
     },
     stop() {
-      stopping = true;
-      client?.stop();
-      client = undefined;
+      run?.stop();
+      run = undefined;
     },
   };
 }
@@ -78,6 +78,7 @@ async function startWhenReady(
   bridgeRuntime: StatusSourceBridgeRuntime,
   client: CodexAppServerClient,
   config: CodexSourceConfig,
+  isActive: () => boolean,
 ) {
   if (config.turn.prompt?.trim() && config.turn.waitForClient) {
     console.log(
@@ -86,5 +87,5 @@ async function startWhenReady(
     await bridgeRuntime.waitForClient();
   }
 
-  await startCodexSession(client, config.turn);
+  if (isActive()) await startCodexSession(client, config.turn);
 }

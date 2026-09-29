@@ -1,6 +1,8 @@
-# StackChan 硬件 bring-up
+# StackChan 固件与硬件验证
 
 目标设备：M5StackChan AI Desktop Robot（ESP32-S3）。USB 用于烧录和日志，后续状态连接使用现有 Wi-Fi WebSocket 协议。
+
+当前源码固件版本 `2026.09.29-r1`，默认构建环境为正式 `status-client`；屏幕 demo 需要显式选择 `-e screen-demo`。日常电脑端使用 `npm start` 加普通 Codex CLI。保持银色 motion-eyes-v5、六态＋离线、工作抬头 20°。2026-09-29 已通过 COM3 烧录并读取串口确认设备版本，设备重新连接 bridge 并收到真实事件，见 [烧录验收](../../docs/fix-validation-2026-09-29.md)。
 
 ## 屏幕 demo
 
@@ -44,7 +46,13 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e status-client -t upload --upload-port COM3
 ```
 
-电脑启动 bridge：
+电脑日常启动 bridge：
+
+```powershell
+npm start
+```
+
+开发回放时才启动 mock（先停止同端口的其他 bridge）：
 
 ```powershell
 $env:AGENT_INDICATOR_HOST = "0.0.0.0"
@@ -52,26 +60,26 @@ $env:AGENT_INDICATOR_SOURCE = "mock"
 npm run dev:mock
 ```
 
-固件默认显示浅紫胶囊眼动态表情和底部连接点，隐藏状态文字。点击屏幕切换调试页，查看连接状态、Agent 状态、事件类型、来源和计数，再次点击返回表情。Wi-Fi 每 15 秒重试，WebSocket 每 3 秒重连，并使用 WebSocket ping/pong 检测断线；不会因 Agent 沉默而推断网络已断开。断线显示连接中的表情，调试页显示 Offline，收到有效 `bridge.hello` 后才接收事件。
+固件默认显示银色胶囊眼动态表情和底部连接点，隐藏状态文字。点击屏幕切换调试页，查看连接状态、Agent 状态、事件类型、来源和计数，再次点击返回表情。Wi-Fi 每 15 秒重试，WebSocket 每 3 秒重连，并使用 WebSocket ping/pong 检测断线；不会因 Agent 沉默而推断网络已断开。断线显示灰色插头眼、插座眼和心电图嘴巴，调试页显示 Offline，收到有效 `bridge.hello` 后才接收事件。
 
-当前仅接收 bridge 使用的不分片文本帧；超过 8KB、解析失败或非法事件会被忽略，不显示事件 detail 的任意长文本。调试页刷新最多每秒 10 次，表情按约 30 帧/秒的上限本地更新（实际帧率取决于绘制和网络耗时）。`sleepy`/`sleep` 显示半闭眼/闭眼，不进入芯片深睡眠。
+当前仅接收 bridge 使用的不分片文本帧；超过 8KB、解析失败或非法事件会被忽略，不显示事件 detail 的任意长文本。调试页刷新最多每秒 10 次，表情按约 30 帧/秒的上限本地更新（实际帧率取决于绘制和网络耗时）。`sleepy`/`sleep` 均显示空闲表情，不进入芯片深睡眠。
 
 ### 动态表情
 
 当前版本为 `motion-eyes-v5`，以 [正式动态设计规范](../../docs/design/expression-design.md) 和 [最新预览](../../docs/design/video-motion-review-v5.html) 为准，取代此前柔软伙伴造型。
 
-- 空闲：浅紫胶囊眼、偶尔侧看和眨眼。
+- 空闲：银色胶囊眼、偶尔侧看和眨眼。
 - 思考：左右上方交替看，小点随方向镜像。
 - 执行：只写一行，眼睛跟笔移动，写完清除；抬眼、回正后重写。
 - 等待：琥珀眼左右张望，底部单点缓慢呼吸。
 - 完成：笑眼轻抬，只有左眼眨一次，再保持笑眼直到新状态。
-- 异常：柔红 xx，轻摇一次后保持。
+- 异常：深红 xx，轻摇一次后保持。
 
 editing/tool 显示执行；searching/speaking 显示思考；sleepy/sleep 显示空闲。原始协议和调试页状态保留。联网六态没有嘴巴或腮红；离线为插头眼、插座眼和心电图嘴巴。后文旧版验证记录为历史记录。
 
-所有动画只在屏幕上绘制，不控制舵机或扬声器。
+表情渲染本身只绘制屏幕；头部由独立 HeadMotion 策略控制：空闲与离线回平，工作抬头 20°，等待/完成/异常保持已有目标。不启用扬声器。
 
-联网验收流程：先确认 Source 为 mock、Events 持续增加；再停止/重启 bridge 检查离线和自动恢复；最后切换真实 Codex 事件。当前以上流程已通过（见下方记录）。真实 approval 等待仍沿用项目既有未解决项，不将 mock 的 waiting 当作真实 approval 验证。
+联网验收流程：先确认 Source 为 mock、Events 持续增加；再停止/重启 bridge 检查离线和自动恢复；最后切换真实 Codex 事件。当前以上流程已通过（见下方记录）。真实 CLI approval 已在 2026-09-09 完成等待及恢复验收，仍受 hooks 缺少统一审批解决回调的限制，见 [验收记录](../../docs/fix-validation-2026-09-09.md)。mock 不能代替真实 approval 验证。
 
 先停止占用 8787 的 mock bridge，再运行：
 
@@ -85,7 +93,7 @@ npm run dev:app-server
 
 此命令通过 app-server 发起一次真实任务；不是监听 Codex Desktop 中任意正在进行的任务。任务完成后，屏幕保留最后的 done 状态。首次联调若在沙箱内遇到 TLS 错误，需在获准的沙箱外进程运行 bridge。
 
-## 当前验证记录（2026-09-06）
+## 历史验证记录（2026-09-06）
 
 - COM3：ESP32-S3 revision v0.2，16MB Flash。
 - 原固件备份：`.tmp/hardware-backups/stackchan-original-20260906.bin`，16,777,216 字节；SHA-256 保存在同目录 `.sha256` 文件。

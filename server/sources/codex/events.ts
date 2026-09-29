@@ -146,7 +146,8 @@ function mapCodexNotificationToInput(
     case "item/started":
       return mapItemStarted(notification.params);
     case "item/completed":
-      return mapItemCompleted(notification.params);
+      // Lifecycle restores remaining tools; only turn outcomes are terminal.
+      return undefined;
     case "item/agentMessage/delta":
       return {
         type: "message.delta",
@@ -331,18 +332,6 @@ function mapItemStarted(params: unknown): CodexAgentEventInput | undefined {
     };
   }
 
-  return undefined;
-}
-
-function mapItemCompleted(params: unknown): CodexAgentEventInput | undefined {
-  const itemType = getItemType(params);
-
-  if (!itemType) {
-    return undefined;
-  }
-
-  // Tool failure is model input, not a terminal turn failure. The publisher
-  // restores the remaining activity; turn/completed owns the final outcome.
   return undefined;
 }
 

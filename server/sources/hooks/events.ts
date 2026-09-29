@@ -3,8 +3,10 @@ import type { AgentEventType } from "../../../src/domain/agentStatus";
 import { createAgentEventMessage, normalizeAgentEvent } from "../../../src/domain/statusProtocol";
 import type { SendStatusMessage } from "../statusSource";
 import { PendingApprovals } from "./approvals";
+import hookRegistration from "../../../shared/hook-events.json" with { type: "json" };
 
-export const hookNames = ["SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Stop", "Interrupt", "PreCompact", "PostCompact", "SubagentStart", "SubagentStop"] as const;
+// False entries remain accepted for migration, but have no runtime effect.
+export const hookNames = Object.keys(hookRegistration) as (keyof typeof hookRegistration)[];
 export type HookEvent = {
   id: string;
   hook_event_name: typeof hookNames[number];
@@ -43,7 +45,7 @@ export function createHookEventPublisher(send: SendStatusMessage, pinnedSession?
   let promptObservedAt = -1;
   const seen = new Set<string>();
   const closedTurns = new Set<string>();
-  const tools = new Map<string, { type: AgentEventType; name: string }>();
+  const tools = new Map<string, AgentEventType>();
   const waiting = new PendingApprovals();
   const subagents = new Set<string>();
   let lastHook: string | undefined;
@@ -65,7 +67,7 @@ export function createHookEventPublisher(send: SendStatusMessage, pinnedSession?
   }
   function busy(event: HookEvent) {
     const active = [...tools.values()];
-    emit(waiting.size ? "approval.requested" : active[active.length - 1]?.type ?? (subagents.size ? "tool.started" : "reasoning.started"), `CLI hook: ${event.hook_event_name}`, event.id);
+    emit(waiting.size ? "approval.requested" : active[active.length - 1] ?? (subagents.size ? "tool.started" : "reasoning.started"), `CLI hook: ${event.hook_event_name}`, event.id);
   }
   return {
     status: () => ({ sessionId: session ?? null, turnId: turn ?? null, lastHook, accepted, ignored, activeTools: tools.size, pendingApprovals: waiting.size, activeSubagents: subagents.size }),
@@ -77,8 +79,8 @@ export function createHookEventPublisher(send: SendStatusMessage, pinnedSession?
       emit("turn.failed", "CLI terminal failure (local transcript)");
       return true;
     },
-    reset(expectedSession: string | null) {
-      if ((session ?? null) !== expectedSession) return false;
+    reset(expectedSession: string | null, expectedTurn: string | null) {
+      if ((session ?? null) !== expectedSession || (turn ?? null) !== expectedTurn) return false;
       closeTurn();
       turn = undefined;
       session = pinnedSession;
@@ -91,6 +93,7 @@ export function createHookEventPublisher(send: SendStatusMessage, pinnedSession?
     },
     receive(event: HookEvent) {
       const ignore = () => { ignored++; return false; };
+      if (!hookRegistration[event.hook_event_name]) return ignore();
       if (seen.has(event.id)) return ignore();
       remember(seen, event.id);
       // A delayed tool event from a reset turn must not reclaim ownership.
@@ -130,7 +133,7 @@ export function createHookEventPublisher(send: SendStatusMessage, pinnedSession?
         case "UserPromptSubmit": emit("turn.started", "CLI prompt submitted", event.id); break;
         case "PreToolUse": {
           const type = event.tool_name === "Bash" ? "command.started" : event.tool_name === "apply_patch" ? "file.change" : "tool.started";
-          tools.set(event.tool_use_id!, { type, name: event.tool_name! });
+          tools.set(event.tool_use_id!, type);
           waiting.start(event);
           busy(event);
           break;
@@ -162,7 +165,6 @@ export function createHookEventPublisher(send: SendStatusMessage, pinnedSession?
         case "SubagentStart": subagents.add(event.agent_id!); busy(event); break;
         case "SubagentStop": subagents.delete(event.agent_id!); busy(event); break;
         case "PreCompact": case "PostCompact": busy(event); break;
-        case "SessionStart": break;
       }
       if (process.env.AGENT_INDICATOR_DEBUG_EVENTS === "1") console.log(`[codex-hooks] ${event.hook_event_name} session=${event.session_id} turn=${event.turn_id ?? "-"}`);
       return true;
