@@ -164,10 +164,7 @@ export function createInitialSnapshot(now = Date.now()): AgentSnapshot {
   };
 }
 
-export function reduceAgentSnapshot(
-  snapshot: AgentSnapshot,
-  event: AgentEvent,
-): AgentSnapshot {
+export function reduceAgentSnapshot(snapshot: AgentSnapshot, event: AgentEvent): AgentSnapshot {
   const resolvedState = mapEventToState(event, snapshot.state);
   const meta = stateMeta[resolvedState];
 
@@ -184,10 +181,7 @@ export function reduceAgentSnapshot(
   };
 }
 
-export function mapEventToState(
-  event: AgentEvent,
-  fallback: AgentState,
-): AgentState {
+export function mapEventToState(event: AgentEvent, fallback: AgentState): AgentState {
   switch (event.type) {
     case "turn.started":
       return "thinking";
@@ -221,14 +215,9 @@ export function mapEventToState(
 }
 
 export function isAgentEventType(value: unknown): value is AgentEventType {
-  return (
-    typeof value === "string" && agentEventTypes.includes(value as AgentEventType)
-  );
+  return typeof value === "string" && agentEventTypes.includes(value as AgentEventType);
 }
 
 export function isAgentEventOrigin(value: unknown): value is AgentEventOrigin {
-  return (
-    typeof value === "string" &&
-    agentEventOrigins.includes(value as AgentEventOrigin)
-  );
+  return typeof value === "string" && agentEventOrigins.includes(value as AgentEventOrigin);
 }

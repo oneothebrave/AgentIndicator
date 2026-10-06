@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.tmp/
+.codex/
+.agents/
+firmware/
+docs/design/video-motion-study.html
+docs/design/video-motion-review-v4.html
+docs/design/stackchan-soft-companion-v2.html
+docs/design/stackchan-expression-directions.html
+package-lock.json

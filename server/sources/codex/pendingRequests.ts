@@ -20,11 +20,7 @@ export class PendingJsonRpcRequests {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(options.id);
-        reject(
-          new Error(
-            `Timed out waiting for codex app-server response to ${options.method}`,
-          ),
-        );
+        reject(new Error(`Timed out waiting for codex app-server response to ${options.method}`));
       }, options.timeoutMs);
 
       this.pending.set(options.id, {
@@ -54,10 +50,7 @@ export class PendingJsonRpcRequests {
 
     if (response.error) {
       pending.reject(
-        new Error(
-          response.error.message ??
-            `codex app-server ${pending.method} request failed`,
-        ),
+        new Error(response.error.message ?? `codex app-server ${pending.method} request failed`),
       );
       return;
     }
@@ -84,9 +77,7 @@ export class PendingJsonRpcRequests {
     clearTimeout(pending.timeout);
     this.pending.delete(id);
     pending.reject(
-      error instanceof Error
-        ? error
-        : new Error(getErrorMessage(error, "JSON-RPC request failed")),
+      error instanceof Error ? error : new Error(getErrorMessage(error, "JSON-RPC request failed")),
     );
   }
 }

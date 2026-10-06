@@ -30,10 +30,7 @@ export function StatusControls({
       <div className="controlGroup">
         <div className="groupLabel">Bridge</div>
         <div className="bridgeStatusRow">
-          <span
-            className={`connectionBadge connection-${connectionState}`}
-            title={lastError}
-          >
+          <span className={`connectionBadge connection-${connectionState}`} title={lastError}>
             {connectionState}
           </span>
           <span className="lastSeen">{formatLastSeen(lastMessageAt)}</span>

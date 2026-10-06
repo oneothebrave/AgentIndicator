@@ -5,7 +5,14 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import { WebSocket } from "ws";
-import { bridgeSettings, settings, health, canBind, inspect, createDiagnosticReporter } from "./indicator.mjs";
+import {
+  bridgeSettings,
+  settings,
+  health,
+  canBind,
+  inspect,
+  createDiagnosticReporter,
+} from "./indicator.mjs";
 
 async function listener(handler) {
   const server = createServer(handler);
@@ -16,38 +23,64 @@ async function listener(handler) {
 async function freePort() {
   const server = await listener();
   const port = server.address().port;
-  await new Promise(resolve => server.close(resolve));
+  await new Promise((resolve) => server.close(resolve));
   return port;
 }
 function child(config, ...args) {
-  const p = spawn(process.execPath, ["scripts/indicator.mjs", ...args], { env: {
-    ...process.env, AGENT_INDICATOR_HOST: "127.0.0.1", AGENT_INDICATOR_PORT: String(config.port),
-    AGENT_INDICATOR_HOOK_PORT: String(config.hookPort), AGENT_INDICATOR_SOURCE: "codex",
-    AGENT_INDICATOR_CODEX_PROMPT: "must not start an app-server task",
-  }, stdio: ["ignore", "pipe", "pipe"] });
+  const childProcess = spawn(process.execPath, ["scripts/indicator.mjs", ...args], {
+    env: {
+      ...process.env,
+      AGENT_INDICATOR_HOST: "127.0.0.1",
+      AGENT_INDICATOR_PORT: String(config.port),
+      AGENT_INDICATOR_HOOK_PORT: String(config.hookPort),
+      AGENT_INDICATOR_SOURCE: "codex",
+      AGENT_INDICATOR_CODEX_PROMPT: "must not start an app-server task",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   let output = "";
-  p.stdout.on("data", b => { output += b; }); p.stderr.on("data", b => { output += b; });
-  return { p, output: () => output, ended: once(p, "exit") };
+  childProcess.stdout.on("data", (chunk) => {
+    output += chunk;
+  });
+  childProcess.stderr.on("data", (chunk) => {
+    output += chunk;
+  });
+  return { p: childProcess, output: () => output, ended: once(childProcess, "exit") };
 }
 async function until(fn) {
-  for (let i = 0; i < 60; i++) { if (await fn()) return; await delay(100); }
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (await fn()) {
+      return;
+    }
+    await delay(100);
+  }
   throw new Error("Timed out waiting for bridge");
 }
 
 test("reject invalid and colliding port configuration", () => {
-  for (const port of ["0", "-1", "abc", "65536", "1.5", "8788"])
+  for (const port of ["0", "-1", "abc", "65536", "1.5", "8788"]) {
     assert.throws(() => settings({ AGENT_INDICATOR_PORT: port }));
+  }
 });
 
 test("read-only bridge consumers do not depend on a hooks listener configuration", () => {
-  assert.equal(bridgeSettings({ AGENT_INDICATOR_PORT: "8788", AGENT_INDICATOR_HOOK_PORT: "invalid" }).port, 8788);
+  assert.equal(
+    bridgeSettings({ AGENT_INDICATOR_PORT: "8788", AGENT_INDICATOR_HOOK_PORT: "invalid" }).port,
+    8788,
+  );
 });
 
 test("diagnostics report observer degradation and recovery without timestamp spam", () => {
   const printed = [];
-  const report = createDiagnosticReporter(s => printed.push(s.hooks.terminalObserver.phase));
-  const status = (phase, error = null, lastReadAt = 0) => ({ bridgeOK: true, hooksOK: true, bridge: { clients: 1 },
-    hooks: { terminalObserver: { phase, error, lastReadAt } } });
+  const report = createDiagnosticReporter((status) =>
+    printed.push(status.hooks.terminalObserver.phase),
+  );
+  const status = (phase, error = null, lastReadAt = 0) => ({
+    bridgeOK: true,
+    hooksOK: true,
+    bridge: { clients: 1 },
+    hooks: { terminalObserver: { phase, error, lastReadAt } },
+  });
   report(status("reading"));
   report(status("reading", null, 100));
   report(status("missing"));
@@ -58,66 +91,158 @@ test("diagnostics report observer degradation and recovery without timestamp spa
   assert.deepEqual(printed, ["reading", "missing", "ambiguous", "error", "error", "reading"]);
 });
 
+test("diagnostics report CLI observer degradation without unrelated refreshes", () => {
+  const printed = [];
+  const report = createDiagnosticReporter((status) => printed.push(status.hooks.cliObserver.phase));
+  const status = (phase, error) => ({
+    bridgeOK: true,
+    hooksOK: true,
+    bridge: { clients: 1 },
+    hooks: { cliObserver: { phase, error } },
+  });
+  report(status("watching"));
+  report(status("watching"));
+  report(status("degraded", "process-wait-unavailable"));
+  report(status("watching"));
+  report(status("unbound"));
+  assert.deepEqual(printed, ["watching", "degraded", "watching", "unbound"]);
+});
+
 test("health bounds stalled responses and detects occupied ports", async () => {
-  const server = await listener((_req, res) => { res.writeHead(200); res.write("{"); });
+  const server = await listener((_req, res) => {
+    res.writeHead(200);
+    res.write("{");
+  });
   try {
     const port = server.address().port;
     assert.equal((await canBind("127.0.0.1", port)).free, false);
     const start = Date.now();
     assert.equal(await health("127.0.0.1", port), null);
     assert.ok(Date.now() - start < 2500);
-  } finally { server.closeAllConnections(); await new Promise(r => server.close(r)); }
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test("foreign service conflict does not terminate the occupied server", async () => {
-  const server = await listener((_req, res) => res.end(JSON.stringify({ ok: true, source: "mock" })));
+  const server = await listener((_req, res) =>
+    res.end(JSON.stringify({ ok: true, source: "mock" })),
+  );
   try {
     const run = child({ port: server.address().port, hookPort: await freePort() });
     const [code] = await run.ended;
     assert.equal(code, 1, run.output());
     assert.match(run.output(), /端口.*不可用/);
     assert.equal((await health("127.0.0.1", server.address().port)).source, "mock");
-  } finally { server.closeAllConnections(); await new Promise(r => server.close(r)); }
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
-test("fresh startup, reuse, doctor, websocket reconnect and hook delivery", { timeout: 20000 }, async () => {
-  const config = { host: "127.0.0.1", probeHost: "127.0.0.1", port: await freePort(), hookPort: await freePort() };
-  const run = child(config);
-  let ws;
-  try {
-    await until(async () => (await inspect(config)).ready);
-    assert.equal((await inspect(config)).bridge.clients, 0);
-    for (let attempt = 0; attempt < 2; attempt++) {
-      ws = new WebSocket(`ws://127.0.0.1:${config.port}/status`);
-      const [hello] = await once(ws, "message");
-      assert.equal(JSON.parse(hello).kind, "bridge.hello");
-      await until(async () => (await inspect(config)).bridge.clients === 1);
-      ws.close(); await once(ws, "close");
-      await until(async () => (await inspect(config)).bridge.clients === 0);
+test(
+  "fresh startup, reuse, doctor, websocket reconnect and hook delivery",
+  { timeout: 20000 },
+  async () => {
+    const config = {
+      host: "127.0.0.1",
+      probeHost: "127.0.0.1",
+      port: await freePort(),
+      hookPort: await freePort(),
+    };
+    const run = child(config);
+    let ws;
+    try {
+      await until(async () => (await inspect(config)).ready);
+      assert.equal((await inspect(config)).bridge.clients, 0);
+      // Request parsing remains strict after separating the HTTP handler.
+      const invalidRequests = [
+        { path: "/unknown", method: "POST", body: "{}", status: 404 },
+        { path: "/hook", method: "PUT", body: "{}", status: 404 },
+        { path: "/hook", contentType: "text/plain", body: "{}", status: 415 },
+        { path: "/hook", body: "{", status: 400 },
+        { path: "/hook", body: "{}", status: 400 },
+        { path: "/session/reset", body: "null", status: 400 },
+        { path: "/session/reset", body: "[]", status: 400 },
+        {
+          path: "/session/reset",
+          body: JSON.stringify({ expectedSessionId: 42, expectedTurnId: null }),
+          status: 400,
+        },
+      ];
+      for (const invalidRequest of invalidRequests) {
+        const result = await fetch(`http://127.0.0.1:${config.hookPort}${invalidRequest.path}`, {
+          method: invalidRequest.method ?? "POST",
+          headers: { "content-type": invalidRequest.contentType ?? "application/json" },
+          body: invalidRequest.body,
+        });
+        assert.equal(result.status, invalidRequest.status);
+        assert.deepEqual(await result.json(), {});
+      }
+      assert.equal((await inspect(config)).hooks.accepted, 0);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        ws = new WebSocket(`ws://127.0.0.1:${config.port}/status`);
+        const [hello] = await once(ws, "message");
+        assert.equal(JSON.parse(hello).kind, "bridge.hello");
+        await until(async () => (await inspect(config)).bridge.clients === 1);
+        ws.close();
+        await once(ws, "close");
+        await until(async () => (await inspect(config)).bridge.clients === 0);
+      }
+      const response = await fetch(`http://127.0.0.1:${config.hookPort}/hook`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: "startup-test",
+          hook_event_name: "UserPromptSubmit",
+          session_id: "test-session",
+          turn_id: "test-turn",
+        }),
+      });
+      assert.equal(response.status, 200);
+      assert.equal((await inspect(config)).bridge.latestAgentEvent.type, "turn.started");
+      const rejected = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "http://example.test" },
+        body: JSON.stringify({ expectedSessionId: "test-session" }),
+      });
+      assert.equal(rejected.status, 403);
+      const stale = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expectedSessionId: "stale", expectedTurnId: "test-turn" }),
+      });
+      assert.equal(stale.status, 409);
+      const oldTurn = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expectedSessionId: "test-session", expectedTurnId: "old-turn" }),
+      });
+      assert.equal(oldTurn.status, 409);
+      const missingTurn = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expectedSessionId: "test-session" }),
+      });
+      assert.equal(missingTurn.status, 400);
+      const reset = child(config, "--reset-session");
+      assert.equal((await reset.ended)[0], 0, reset.output());
+      assert.equal((await inspect(config)).hooks.sessionId, null);
+      assert.equal((await inspect(config)).bridge.latestAgentEvent.type, "thread.idle");
+      for (const args of [[], ["--check"]]) {
+        const duplicate = child(config, ...args);
+        assert.equal((await duplicate.ended)[0], 0, duplicate.output());
+        if (!args.length) {
+          assert.match(duplicate.output(), /复用现有服务/);
+        }
+      }
+    } finally {
+      ws?.terminate();
+      run.p.kill();
+      await run.ended;
     }
-    const response = await fetch(`http://127.0.0.1:${config.hookPort}/hook`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "startup-test", hook_event_name: "UserPromptSubmit", session_id: "test-session", turn_id: "test-turn" }) });
-    assert.equal(response.status, 200);
-    assert.equal((await inspect(config)).bridge.latestAgentEvent.type, "turn.started");
-    const rejected = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json", origin: "http://example.test" }, body: JSON.stringify({ expectedSessionId: "test-session" }) });
-    assert.equal(rejected.status, 403);
-    const stale = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedSessionId: "stale", expectedTurnId: "test-turn" }) });
-    assert.equal(stale.status, 409);
-    const oldTurn = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedSessionId: "test-session", expectedTurnId: "old-turn" }) });
-    assert.equal(oldTurn.status, 409);
-    const missingTurn = await fetch(`http://127.0.0.1:${config.hookPort}/session/reset`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedSessionId: "test-session" }) });
-    assert.equal(missingTurn.status, 400);
-    const reset = child(config, "--reset-session");
-    assert.equal((await reset.ended)[0], 0, reset.output());
-    assert.equal((await inspect(config)).hooks.sessionId, null);
-    assert.equal((await inspect(config)).bridge.latestAgentEvent.type, "thread.idle");
-    for (const args of [[], ["--check"]]) {
-      const duplicate = child(config, ...args);
-      assert.equal((await duplicate.ended)[0], 0, duplicate.output());
-      if (!args.length) assert.match(duplicate.output(), /复用现有服务/);
-    }
-  } finally {
-    ws?.terminate(); run.p.kill(); await run.ended;
-  }
-  const offline = child(config, "--check");
-  assert.equal((await offline.ended)[0], 1, offline.output());
-});
+    const offline = child(config, "--check");
+    assert.equal((await offline.ended)[0], 1, offline.output());
+  },
+);

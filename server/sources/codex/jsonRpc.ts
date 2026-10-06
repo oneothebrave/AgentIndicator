@@ -45,8 +45,6 @@ export function isJsonRpcRequestOrNotification(
   return isRecord(value) && typeof value.method === "string";
 }
 
-export function isJsonRpcServerRequest(
-  value: unknown,
-): value is JsonRpcServerRequest {
+export function isJsonRpcServerRequest(value: unknown): value is JsonRpcServerRequest {
   return isJsonRpcRequestOrNotification(value) && value.id !== undefined;
 }

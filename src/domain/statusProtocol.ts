@@ -1,15 +1,10 @@
-import {
-  isAgentEventOrigin,
-  isAgentEventType,
-  type AgentEvent,
-} from "./agentStatus";
+import { isAgentEventOrigin, isAgentEventType, type AgentEvent } from "./agentStatus";
 
 export const STATUS_PROTOCOL_VERSION = 1;
 export const BRIDGE_HELLO_KIND = "bridge.hello";
 export const AGENT_EVENT_KIND = "agent.event";
 
-export type AgentEventInput = Omit<AgentEvent, "at"> &
-  Partial<Pick<AgentEvent, "at">>;
+export type AgentEventInput = Omit<AgentEvent, "at"> & Partial<Pick<AgentEvent, "at">>;
 
 export type BridgeHelloInput = {
   source: string;
@@ -32,9 +27,7 @@ export type AgentEventMessage = {
 
 export type StatusMessage = BridgeHelloMessage | AgentEventMessage;
 
-export function createBridgeHelloMessage(
-  input: BridgeHelloInput,
-): BridgeHelloMessage {
+export function createBridgeHelloMessage(input: BridgeHelloInput): BridgeHelloMessage {
   return {
     kind: BRIDGE_HELLO_KIND,
     source: input.source,

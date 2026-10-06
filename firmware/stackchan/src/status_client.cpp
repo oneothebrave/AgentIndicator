@@ -23,6 +23,8 @@ namespace {
 WebSocketsClient socket;
 FaceRenderer face;
 HeadMotion head;
+PresentationPolicy presentation;
+uint32_t displayedCelebration = 0;
 bool debugPage = false;
 uint32_t lastTap = 0;
 bool wifiConnected = false;
@@ -30,7 +32,7 @@ bool wifiConfigured = true;
 bool socketStarted = false;
 bool socketConnected = false;
 bool protocolReady = false;
-bool dirty = true; // UI task only
+bool dirty = true;  // UI task only
 uint32_t connectedAt = 0;
 uint32_t lastWifiAttempt = 0;
 uint32_t lastDraw = 0;
@@ -39,23 +41,38 @@ const EventState* currentEvent = nullptr;
 const char* connectionLabel = "Wi-Fi connecting";
 const char* origin = "-";
 
-
 // Network state has one owner. Only immutable/static pointers cross this queue.
 struct DisplayState {
-  bool wifiConnected, protocolReady;
+  bool wifiConnected;
+  bool protocolReady;
   uint32_t eventCount;
   const EventState* currentEvent;
   const char* connectionLabel;
   const char* origin;
   uint32_t ip;
+  const char* presentationState;
+  bool completionSettled;
+  uint32_t celebrationGeneration;
 };
+
 QueueHandle_t displayQueue = nullptr;
-DisplayState displayed = {false, false, 0, nullptr, "Wi-Fi connecting", "-", 0};
+DisplayState displayed = {false, false, 0,         nullptr, "Wi-Fi connecting",
+                          "-",   0,     "offline", false,   0};
+
 void publishDisplayState() {
-  DisplayState state = {wifiConnected, protocolReady, eventCount, currentEvent,
-    connectionLabel, origin, wifiConnected ? (uint32_t)WiFi.localIP() : 0};
+  DisplayState state = {wifiConnected,
+                        protocolReady,
+                        eventCount,
+                        currentEvent,
+                        connectionLabel,
+                        origin,
+                        wifiConnected ? (uint32_t)WiFi.localIP() : 0,
+                        presentation.state(),
+                        presentation.completionSettled(),
+                        presentation.celebrationGeneration()};
   xQueueOverwrite(displayQueue, &state);
 }
+
 void networkTask(void*);
 
 void setConnection(const char* label) {
@@ -79,16 +96,20 @@ void draw() {
   M5.Display.print(connectionLabel);
   const uint32_t rgb = protocolReady && currentEvent ? currentEvent->color : 0x64748b;
   M5.Display.fillRect(16, 79, 288, 5,
-    M5.Display.color565((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255));
+                      M5.Display.color565((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255));
   M5.Display.setTextSize(3);
   M5.Display.setCursor(16, 102);
-  M5.Display.print(protocolReady ? (currentEvent ? currentEvent->state : "No event yet") : "Offline");
+  M5.Display.print(protocolReady ? displayed.presentationState : "Offline");
   M5.Display.setTextSize(1);
   M5.Display.setCursor(16, 153);
-  // Never show a stale Agent state as current while disconnected.
-  M5.Display.printf("Event: %s\n", protocolReady && currentEvent ? currentEvent->event : "-");
+  // Keep the real event visible while the presentation has returned to idle.
+  M5.Display.printf("Last: %s  %s", currentEvent ? currentEvent->state : "-",
+                    displayed.completionSettled ? "(done settled)" : "");
+  M5.Display.setCursor(16, 164);
+  M5.Display.print(currentEvent ? currentEvent->event : "-");
   M5.Display.setCursor(16, 175);
-  M5.Display.printf("Source: %s    Events: %lu", protocolReady ? origin : "-", (unsigned long)eventCount);
+  M5.Display.printf("Source: %s    Events: %lu", protocolReady ? origin : "-",
+                    (unsigned long)eventCount);
   M5.Display.setCursor(16, 198);
   M5.Display.printf("Bridge: %s:%u", BRIDGE_HOST, BRIDGE_PORT);
   M5.Display.setCursor(16, 217);
@@ -99,21 +120,36 @@ void draw() {
 
 void receiveMessage(uint8_t* payload, size_t length) {
   const auto decoded = decodeStatusMessage(payload, length, protocolReady);
-  switch(decoded.kind) {
+  switch (decoded.kind) {
     case MessageKind::Hello:
-      protocolReady = true; currentEvent = nullptr; origin = "-";
+      protocolReady = true;
+      presentation.hello(decoded.at);
+      currentEvent = nullptr;
+      origin = "-";
       setConnection("Connected");
       Serial.println("status-client hello version=1");
       break;
     case MessageKind::ProtocolError:
-      protocolReady = false; setConnection("Protocol error"); break;
-    case MessageKind::Event:
-      currentEvent = decoded.event; origin = decoded.origin; ++eventCount;
-      Serial.printf("status-client event=%s state=%s origin=%s count=%lu\n",
-        currentEvent->event, currentEvent->state, origin, (unsigned long)eventCount);
+      protocolReady = false;
+      presentation.disconnect();
+      setConnection("Protocol error");
       break;
-    case MessageKind::Ignored: break;
-    default: Serial.printf("status-client rejected=%d\n", (int)decoded.kind); break;
+    case MessageKind::Event:
+      if (!presentation.receive(decoded.event, decoded.id, decoded.at, millis())) {
+        break;
+      }
+      currentEvent = decoded.event;
+      origin = decoded.origin;
+      ++eventCount;
+      Serial.printf("status-client event=%s state=%s display=%s settled=%d origin=%s count=%lu\n",
+                    currentEvent->event, currentEvent->state, presentation.state(),
+                    presentation.completionSettled(), origin, (unsigned long)eventCount);
+      break;
+    case MessageKind::Ignored:
+      break;
+    default:
+      Serial.printf("status-client rejected=%d\n", (int)decoded.kind);
+      break;
   }
 }
 
@@ -122,12 +158,14 @@ void onSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
     case WStype_CONNECTED:
       socketConnected = true;
       protocolReady = false;
+      presentation.disconnect();
       connectedAt = millis();
       setConnection("Awaiting hello");
       break;
     case WStype_DISCONNECTED:
       socketConnected = false;
       protocolReady = false;
+      presentation.disconnect();
       setConnection(wifiConnected ? "Bridge connecting" : "Wi-Fi connecting");
       publishDisplayState();
       break;
@@ -138,17 +176,18 @@ void onSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
       break;
   }
 }
-} // namespace
+}  // namespace
 
 void setup() {
-  auto cfg = M5.config();
-  cfg.fallback_board = m5::board_t::board_M5StackChan;
-  cfg.internal_imu = false;
-  cfg.internal_rtc = false;
-  cfg.internal_mic = false;
-  cfg.internal_spk = false;
-  M5.begin(cfg);
-  Serial.printf("firmware version=%s design=motion-eyes-v5-silver rise=20deg\n", INDICATOR_FIRMWARE_VERSION);
+  auto config = M5.config();
+  config.fallback_board = m5::board_t::board_M5StackChan;
+  config.internal_imu = false;
+  config.internal_rtc = false;
+  config.internal_mic = false;
+  config.internal_spk = false;
+  M5.begin(config);
+  Serial.printf("firmware version=%s design=motion-eyes-v5-silver rise=20deg\n",
+                INDICATOR_FIRMWARE_VERSION);
   Serial.begin(115200);
   M5.Display.setRotation(1);
   M5.Display.setBrightness(100);
@@ -158,11 +197,11 @@ void setup() {
   }
   head.begin();
   displayQueue = xQueueCreate(1, sizeof(DisplayState));
-  if (!displayQueue || xTaskCreatePinnedToCore(networkTask, "indicator-network", 8192, nullptr, 1, nullptr, 0) != pdPASS) {
+  if (!displayQueue || xTaskCreatePinnedToCore(networkTask, "indicator-network", 8192, nullptr, 1,
+                                               nullptr, 0) != pdPASS) {
     displayed.connectionLabel = "Network task failed";
     Serial.println("status-client network-task=failed");
   }
-
 }
 
 void loop() {
@@ -175,13 +214,20 @@ void loop() {
   }
   DisplayState latest;
   if (displayQueue && xQueueReceive(displayQueue, &latest, 0) == pdTRUE) {
-    dirty = dirty || latest.wifiConnected != displayed.wifiConnected || latest.protocolReady != displayed.protocolReady
-      || latest.eventCount != displayed.eventCount || latest.connectionLabel != displayed.connectionLabel || latest.ip != displayed.ip
-      || latest.currentEvent != displayed.currentEvent || latest.origin != displayed.origin;
+    dirty = dirty || latest.wifiConnected != displayed.wifiConnected ||
+            latest.protocolReady != displayed.protocolReady ||
+            latest.eventCount != displayed.eventCount ||
+            latest.connectionLabel != displayed.connectionLabel || latest.ip != displayed.ip ||
+            latest.currentEvent != displayed.currentEvent || latest.origin != displayed.origin;
+    dirty = dirty || latest.presentationState != displayed.presentationState ||
+            latest.completionSettled != displayed.completionSettled;
     displayed = latest;
   }
-  head.update(displayed.protocolReady, displayed.currentEvent ? displayed.currentEvent->state : "idle");
-  face.update(millis(), displayed.protocolReady, displayed.currentEvent ? displayed.currentEvent->state : "idle", !debugPage);
+  head.update(displayed.protocolReady, displayed.presentationState);
+  const bool newCelebration = displayed.celebrationGeneration != displayedCelebration;
+  face.update(millis(), displayed.protocolReady, displayed.presentationState, !debugPage,
+              newCelebration && !strcmp(displayed.presentationState, "done"));
+  displayedCelebration = displayed.celebrationGeneration;
   if (debugPage && dirty && millis() - lastDraw >= 100) {
     dirty = false;
     lastDraw = millis();
@@ -202,47 +248,58 @@ void networkTask(void*) {
     wifiConfigured = esp_wifi_get_config(WIFI_IF_STA, &saved) == ESP_OK && saved.sta.ssid[0] != 0;
     memset(&saved, 0, sizeof(saved));
     Serial.printf("status-client saved-wifi-present=%d\n", wifiConfigured);
-    if (wifiConfigured) WiFi.begin();
+    if (wifiConfigured) {
+      WiFi.begin();
+    }
   } else {
     wifiConfigured = WIFI_SSID[0] != 0;
-    if (wifiConfigured) WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    if (wifiConfigured) {
+      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    }
   }
-  if (!wifiConfigured) setConnection("Wi-Fi not configured");
+  if (!wifiConfigured) {
+    setConnection("Wi-Fi not configured");
+  }
   lastWifiAttempt = millis();
-  Serial.printf("status-client boot board=%d display=%dx%d saved-wifi=%d\n",
-                (int)M5.getBoard(), M5.Display.width(), M5.Display.height(), USE_SAVED_WIFI);
+  Serial.printf("status-client boot board=%d display=%dx%d saved-wifi=%d\n", (int)M5.getBoard(),
+                M5.Display.width(), M5.Display.height(), USE_SAVED_WIFI);
   for (;;) {
-  bool connected = WiFi.status() == WL_CONNECTED;
-  if (connected != wifiConnected) {
-    wifiConnected = connected;
-    if (connected) {
-      Serial.printf("status-client wifi-connected ip=%s\n", WiFi.localIP().toString().c_str());
-      setConnection("Bridge connecting");
-      if (!socketStarted) {
-        socket.begin(BRIDGE_HOST, BRIDGE_PORT, "/status");
-        socketStarted = true;
+    bool connected = WiFi.status() == WL_CONNECTED;
+    if (connected != wifiConnected) {
+      wifiConnected = connected;
+      if (connected) {
+        Serial.printf("status-client wifi-connected ip=%s\n", WiFi.localIP().toString().c_str());
+        setConnection("Bridge connecting");
+        if (!socketStarted) {
+          socket.begin(BRIDGE_HOST, BRIDGE_PORT, "/status");
+          socketStarted = true;
+        }
+      } else {
+        socketConnected = false;
+        protocolReady = false;
+        presentation.disconnect();
+        setConnection("Wi-Fi connecting");
+        publishDisplayState();
+        socket.disconnect();
       }
-    } else {
-      socketConnected = false;
-      protocolReady = false;
-      setConnection("Wi-Fi connecting");
-      publishDisplayState();
-      socket.disconnect();
     }
-  }
-  if (connected) {
-    socket.loop();
-    if (socketConnected && !protocolReady && millis() - connectedAt > 5000) {
-      socket.disconnect();
+    if (connected) {
+      socket.loop();
+      if (socketConnected && !protocolReady && millis() - connectedAt > 5000) {
+        socket.disconnect();
+      }
+    } else if (wifiConfigured && millis() - lastWifiAttempt >= 15000) {
+      lastWifiAttempt = millis();
+      Serial.printf("status-client wifi-retry status=%d saved-wifi=%d\n", (int)WiFi.status(),
+                    USE_SAVED_WIFI);
+      WiFi.reconnect();
     }
-  } else if (wifiConfigured && millis() - lastWifiAttempt >= 15000) {
-    lastWifiAttempt = millis();
-    Serial.printf("status-client wifi-retry status=%d saved-wifi=%d\n", (int)WiFi.status(), USE_SAVED_WIFI);
-    WiFi.reconnect();
-  }
 
+    if (presentation.tick(millis())) {
+      Serial.println("presentation state=idle last=done reason=completion-settled");
+    }
     publishDisplayState();
     vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
-} // namespace
+}  // namespace

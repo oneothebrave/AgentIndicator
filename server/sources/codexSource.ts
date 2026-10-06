@@ -5,10 +5,7 @@ import { resolveServerRequest } from "./codex/serverRequests";
 import { startCodexSession } from "./codex/session";
 import type { CodexSourceConfig } from "./codex/types";
 import { getErrorMessage } from "./codex/utils";
-import type {
-  StatusSource,
-  StatusSourceBridgeRuntime,
-} from "./statusSource";
+import type { StatusSource, StatusSourceBridgeRuntime } from "./statusSource";
 
 export type { CodexNotification, CodexSourceConfig } from "./codex/types";
 export {
@@ -38,22 +35,32 @@ export function createCodexSource(
         client.stop();
       };
       const fail = (detail: string) => {
-        if (!active) return;
+        if (!active) {
+          return;
+        }
         // A startup timeout doesn't prove the model failed. Stop this source
         // explicitly, then report its failure once. No late events may revive it.
         stop();
-        codexEvents.publishAgentEvent({ type: "turn.failed", label: "Error", detail: `Codex source stopped: ${detail}` });
+        codexEvents.publishAgentEvent({
+          type: "turn.failed",
+          label: "Error",
+          detail: `Codex source stopped: ${detail}`,
+        });
         console.error("[codex-source]", detail);
       };
       const client = new CodexAppServerClient({
         launch: config.launch,
         client: config.client,
         onNotification(notification) {
-          if (!active) return;
+          if (!active) {
+            return;
+          }
           codexEvents.publishNotificationFromCodex(notification);
         },
         onServerRequest(request) {
-          if (!active) throw new Error("Codex source stopped");
+          if (!active) {
+            throw new Error("Codex source stopped");
+          }
           codexEvents.publishServerRequestFromCodex(request);
           return resolveServerRequest(request);
         },
@@ -81,11 +88,11 @@ async function startWhenReady(
   isActive: () => boolean,
 ) {
   if (config.turn.prompt?.trim() && config.turn.waitForClient) {
-    console.log(
-      "[codex-source] waiting for a WebSocket client before starting Codex turn",
-    );
+    console.log("[codex-source] waiting for a WebSocket client before starting Codex turn");
     await bridgeRuntime.waitForClient();
   }
 
-  if (isActive()) await startCodexSession(client, config.turn);
+  if (isActive()) {
+    await startCodexSession(client, config.turn);
+  }
 }

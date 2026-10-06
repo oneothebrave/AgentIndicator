@@ -22,10 +22,7 @@ export function getErrorMessage(value: unknown, fallback: string): string {
   return fallback;
 }
 
-export function getNestedString(
-  value: unknown,
-  path: string[],
-): string | undefined {
+export function getNestedString(value: unknown, path: string[]): string | undefined {
   const nested = getNestedValue(value, path);
   return typeof nested === "string" ? nested : undefined;
 }

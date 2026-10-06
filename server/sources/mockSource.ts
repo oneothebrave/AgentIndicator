@@ -1,13 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { demoTimeline } from "../../src/data/demoTimeline";
-import {
-  createAgentEventMessage,
-  normalizeAgentEvent,
-} from "../../src/domain/statusProtocol";
-import type {
-  StatusSource,
-  StatusSourceBridgeRuntime,
-} from "./statusSource";
+import { createAgentEventMessage, normalizeAgentEvent } from "../../src/domain/statusProtocol";
+import type { StatusSource, StatusSourceBridgeRuntime } from "./statusSource";
 
 export type MockSourceOptions = {
   intervalMs: number;

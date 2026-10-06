@@ -33,7 +33,10 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
   const alive = new WeakMap<WebSocket, boolean>();
   const heartbeat = setInterval(() => {
     for (const client of clients) {
-      if (!alive.get(client)) { client.terminate(); continue; }
+      if (!alive.get(client)) {
+        client.terminate();
+        continue;
+      }
       alive.set(client, false);
       client.ping();
     }
@@ -81,7 +84,9 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
       clearInterval(heartbeat);
       // A peer with a broken network must not hold shutdown indefinitely.
       const forceClose = setTimeout(() => {
-        for (const client of clients) client.terminate();
+        for (const client of clients) {
+          client.terminate();
+        }
         server.closeAllConnections();
       }, 2000);
       forceClose.unref();
@@ -90,7 +95,10 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
       }
 
       wss.close(() => {
-        server.close(() => { clearTimeout(forceClose); onClosed?.(); });
+        server.close(() => {
+          clearTimeout(forceClose);
+          onClosed?.();
+        });
       });
     },
     getClientCount() {
@@ -110,9 +118,7 @@ export function createBridgeServer(config: BridgeServerConfig): BridgeServer {
         console.log(
           `[bridge] status stream ws://${config.host}:${config.port}${config.statusPath}`,
         );
-        console.log(
-          `[bridge] health check http://${config.host}:${config.port}/health`,
-        );
+        console.log(`[bridge] health check http://${config.host}:${config.port}/health`);
         onListening?.();
       });
     },

@@ -2,10 +2,7 @@ import type { CodexAppServerClient } from "./client";
 import type { CodexThreadStartResult, CodexTurnConfig } from "./types";
 import { getNestedString } from "./utils";
 
-export async function startCodexSession(
-  client: CodexAppServerClient,
-  turnConfig: CodexTurnConfig,
-) {
+export async function startCodexSession(client: CodexAppServerClient, turnConfig: CodexTurnConfig) {
   client.start();
 
   await client.request("initialize", {
@@ -114,8 +111,5 @@ function toSandboxPolicy(turnConfig: CodexTurnConfig) {
 }
 
 function extractThreadId(result: unknown): string | undefined {
-  return (
-    getNestedString(result, ["thread", "id"]) ??
-    getNestedString(result, ["threadId"])
-  );
+  return getNestedString(result, ["thread", "id"]) ?? getNestedString(result, ["threadId"]);
 }

@@ -3,23 +3,15 @@ import type { AgentEvent } from "../domain/agentStatus";
 import { isStatusMessage } from "../domain/statusProtocol";
 
 export type StreamConnectionState =
-  | "connecting"
-  | "connected"
-  | "reconnecting"
-  | "disconnected"
-  | "error";
+  "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
 
 type UseStatusStreamOptions = {
   url: string;
   onEvent: (event: AgentEvent) => void;
 };
 
-export function useStatusStream({
-  url,
-  onEvent,
-}: UseStatusStreamOptions) {
-  const [connectionState, setConnectionState] =
-    useState<StreamConnectionState>("connecting");
+export function useStatusStream({ url, onEvent }: UseStatusStreamOptions) {
+  const [connectionState, setConnectionState] = useState<StreamConnectionState>("connecting");
   const [lastMessageAt, setLastMessageAt] = useState<number | undefined>();
   const [lastError, setLastError] = useState<string | undefined>();
   const onEventRef = useRef(onEvent);
@@ -35,9 +27,7 @@ export function useStatusStream({
     let reconnectTimer: number | undefined;
 
     function connect() {
-      setConnectionState(
-        reconnectAttempt === 0 ? "connecting" : "reconnecting",
-      );
+      setConnectionState(reconnectAttempt === 0 ? "connecting" : "reconnecting");
 
       try {
         socket = new WebSocket(url);
@@ -68,9 +58,7 @@ export function useStatusStream({
             onEventRef.current(parsed.event);
           }
         } catch (error) {
-          setLastError(
-            error instanceof Error ? error.message : "Failed to parse message",
-          );
+          setLastError(error instanceof Error ? error.message : "Failed to parse message");
         }
       });
 

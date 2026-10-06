@@ -16,9 +16,11 @@
     "test:contract": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-codex-contract.ps1",
     "events:capture": "node scripts/capture-status-events.mjs",
     "build": "tsc --noEmit && vite build",
+    "format": "prettier --write server src scripts shared \"docs/design/*.html\" index.html package.json tsconfig.json vite.config.ts .prettierrc.json",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "koffi": "^3.3.2",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -30,9 +32,9 @@
     "@types/react-dom": "^18.3.5",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.0.4",
+    "prettier": "^3.9.9",
     "tsx": "^4.23.13",
     "typescript": "^5.7.2",
     "vite": "^6.0.0"
   }
 }
-

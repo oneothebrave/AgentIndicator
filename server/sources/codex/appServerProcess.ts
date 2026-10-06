@@ -55,7 +55,9 @@ export class CodexAppServerProcess {
       this.clearChild();
       // A broken pipe may leave the child alive. Retire this transport before
       // reporting failure; its subsequent close/error events are ignored.
-      if (child.exitCode === null && child.signalCode === null && !child.killed) child.kill();
+      if (child.exitCode === null && child.signalCode === null && !child.killed) {
+        child.kill();
+      }
       this.handlers.onExit(error, description);
     };
 
@@ -68,13 +70,8 @@ export class CodexAppServerProcess {
 
     // close follows drained stdio, so final notifications aren't discarded.
     child.on("close", (code, signal) => {
-      const description = `code ${code ?? "unknown"}, signal ${
-        signal ?? "none"
-      }`;
-      reportExit(
-        new Error(`codex app-server exited with ${description}`),
-        description,
-      );
+      const description = `code ${code ?? "unknown"}, signal ${signal ?? "none"}`;
+      reportExit(new Error(`codex app-server exited with ${description}`), description);
     });
   }
 

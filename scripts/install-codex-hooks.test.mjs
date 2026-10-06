@@ -7,12 +7,16 @@ import { installHooks, updateHookConfig } from "./install-codex-hooks.mjs";
 import registration from "../shared/hook-events.json" with { type: "json" };
 
 test("installer retires SessionStart, preserves unrelated handlers and is idempotent", () => {
-  const ours = { type: "command", command: "ours" }, other = { type: "command", command: "other", timeout: 12 };
-  const config = { description: "preserve", hooks: {
-    SessionStart: [{ matcher: "resume", hooks: [ours, other] }],
-    PreToolUse: [{ matcher: "Bash", hooks: [{ ...ours, command: "legacy" }, other] }],
-    FutureEvent: [{ hooks: [other] }],
-  } };
+  const ours = { type: "command", command: "ours" };
+  const other = { type: "command", command: "other", timeout: 12 };
+  const config = {
+    description: "preserve",
+    hooks: {
+      SessionStart: [{ matcher: "resume", hooks: [ours, other] }],
+      PreToolUse: [{ matcher: "Bash", hooks: [{ ...ours, command: "legacy" }, other] }],
+      FutureEvent: [{ hooks: [other] }],
+    },
+  };
   const options = { command: "ours", legacyCommand: "legacy" };
   const result = updateHookConfig(config, options);
   assert.deepEqual(result.hooks.SessionStart, [{ matcher: "resume", hooks: [other] }]);
@@ -20,7 +24,9 @@ test("installer retires SessionStart, preserves unrelated handlers and is idempo
   assert.deepEqual(result.hooks.FutureEvent, config.hooks.FutureEvent);
   assert.equal(result.description, "preserve");
   for (const [name, enabled] of Object.entries(registration)) {
-    const installed = (result.hooks[name] ?? []).flatMap(g => g.hooks).filter(h => h.command === "ours");
+    const installed = (result.hooks[name] ?? [])
+      .flatMap((group) => group.hooks)
+      .filter((hook) => hook.command === "ours");
     assert.equal(installed.length, enabled ? 1 : 0);
   }
   assert.deepEqual(updateHookConfig(result, options), result);
@@ -30,15 +36,15 @@ test("installer retires SessionStart, preserves unrelated handlers and is idempo
   assert.equal(config.hooks.SessionStart[0].hooks.length, 2);
 });
 
-test("file installation backs up changes, repeated install does not rewrite, invalid input is preserved", async t => {
+test("file installation backs up changes, repeated install does not rewrite, invalid input is preserved", async (context) => {
   const dir = await mkdtemp(join(tmpdir(), "indicator-installer-"));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  context.after(() => rm(dir, { recursive: true, force: true }));
   const target = join(dir, "hooks.json");
   const original = '{"description":"keep","hooks":{}}';
   await writeFile(target, original);
   assert.equal(await installHooks({ target }), true);
   const files = await readdir(dir);
-  const backup = files.find(name => name.endsWith(".bak"));
+  const backup = files.find((name) => name.endsWith(".bak"));
   assert.ok(backup);
   assert.equal(await readFile(join(dir, backup), "utf8"), original);
   assert.equal(await installHooks({ target }), false);

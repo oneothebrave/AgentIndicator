@@ -9,29 +9,21 @@ import {
   type JsonRpcServerRequest,
 } from "./jsonRpc";
 import { PendingJsonRpcRequests } from "./pendingRequests";
-import type {
-  CodexAppServerLaunchConfig,
-  CodexNotification,
-  JsonRpcClientConfig,
-} from "./types";
+import type { CodexAppServerLaunchConfig, CodexNotification, JsonRpcClientConfig } from "./types";
 import { getErrorMessage } from "./utils";
 
 type CodexAppServerClientOptions = {
   launch: CodexAppServerLaunchConfig;
   client: JsonRpcClientConfig;
   onNotification: (notification: CodexNotification) => void;
-  onServerRequest: (
-    request: JsonRpcServerRequest,
-  ) => unknown | Promise<unknown>;
+  onServerRequest: (request: JsonRpcServerRequest) => unknown | Promise<unknown>;
   onExit: (description: string) => void;
 };
 
 export class CodexAppServerClient {
   private readonly clientConfig: JsonRpcClientConfig;
   private readonly onNotification: (notification: CodexNotification) => void;
-  private readonly onServerRequest: (
-    request: JsonRpcServerRequest,
-  ) => unknown | Promise<unknown>;
+  private readonly onServerRequest: (request: JsonRpcServerRequest) => unknown | Promise<unknown>;
   private readonly onExit: (description: string) => void;
   private readonly appServerProcess: CodexAppServerProcess;
   private nextRequestId = 1;
@@ -64,8 +56,7 @@ export class CodexAppServerClient {
     const id = this.nextRequestId;
     this.nextRequestId += 1;
 
-    const message =
-      params === undefined ? { method, id } : { method, id, params };
+    const message = params === undefined ? { method, id } : { method, id, params };
 
     return this.pendingRequests.request({
       id,
@@ -83,9 +74,7 @@ export class CodexAppServerClient {
   }
 
   stop() {
-    this.pendingRequests.rejectAll(
-      new Error("codex app-server client stopped"),
-    );
+    this.pendingRequests.rejectAll(new Error("codex app-server client stopped"));
     this.appServerProcess.stop();
   }
 

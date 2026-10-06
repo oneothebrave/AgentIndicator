@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentEventType } from "../../../src/domain/agentStatus";
-import {
-  AGENT_EVENT_KIND,
-  type StatusMessage,
-} from "../../../src/domain/statusProtocol";
+import { AGENT_EVENT_KIND, type StatusMessage } from "../../../src/domain/statusProtocol";
 import {
   createCodexEventPublisher,
   mapCodexNotificationToAgentEvent,
@@ -98,15 +95,9 @@ describe("Codex app-server notification mapping", () => {
   });
 
   it("maps stream delta notifications", () => {
-    assertNotificationEvent(
-      { method: "item/commandExecution/outputDelta" },
-      "command.started",
-    );
+    assertNotificationEvent({ method: "item/commandExecution/outputDelta" }, "command.started");
     assertNotificationEvent({ method: "item/agentMessage/delta" }, "message.delta");
-    assertNotificationEvent(
-      { method: "item/reasoning/summaryTextDelta" },
-      "reasoning.started",
-    );
+    assertNotificationEvent({ method: "item/reasoning/summaryTextDelta" }, "reasoning.started");
     assertNotificationEvent({ method: "turn/diff/updated" }, "file.change");
   });
 });
@@ -122,9 +113,7 @@ describe("Codex app-server server request mapping", () => {
     ];
 
     for (const method of documentedRequestMethods) {
-      const event = mapCodexServerRequestToAgentEvent(
-        serverRequest(method),
-      );
+      const event = mapCodexServerRequestToAgentEvent(serverRequest(method));
 
       assert.equal(event?.type, "approval.requested", method);
       assert.equal(event?.origin, "codex", method);
@@ -142,21 +131,19 @@ describe("Codex app-server server request mapping", () => {
 
 describe("Codex app-server server request responses", () => {
   it("declines documented command and file-change approval requests", () => {
-    assert.deepEqual(
-      resolveServerRequest(serverRequest("item/commandExecution/requestApproval")),
-      { decision: "decline" },
-    );
-    assert.deepEqual(
-      resolveServerRequest(serverRequest("item/fileChange/requestApproval")),
-      { decision: "decline" },
-    );
+    assert.deepEqual(resolveServerRequest(serverRequest("item/commandExecution/requestApproval")), {
+      decision: "decline",
+    });
+    assert.deepEqual(resolveServerRequest(serverRequest("item/fileChange/requestApproval")), {
+      decision: "decline",
+    });
   });
 
   it("responds to documented permission, tool-input, and MCP elicitation requests", () => {
-    assert.deepEqual(
-      resolveServerRequest(serverRequest("item/permissions/requestApproval")),
-      { permissions: {}, scope: "turn" },
-    );
+    assert.deepEqual(resolveServerRequest(serverRequest("item/permissions/requestApproval")), {
+      permissions: {},
+      scope: "turn",
+    });
     assert.deepEqual(resolveServerRequest(serverRequest("item/tool/requestUserInput")), {
       answers: {},
     });
@@ -201,7 +188,10 @@ describe("Codex event publisher", () => {
 
     publisher.publishNotificationFromCodex({ method: "item/agentMessage/delta" });
     publisher.publishNotificationFromCodex({ method: "item/agentMessage/delta" });
-    publisher.publishNotificationFromCodex({ method: "turn/completed", params: { turn: { status: "completed" } } });
+    publisher.publishNotificationFromCodex({
+      method: "turn/completed",
+      params: { turn: { status: "completed" } },
+    });
 
     assert.deepEqual(
       messages.map((message) => message.kind === AGENT_EVENT_KIND && message.event.type),

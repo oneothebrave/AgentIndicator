@@ -9,10 +9,7 @@ export type CodexAgentEventInput = Omit<AgentEventInput, "id" | "origin">;
 
 export type CodexApprovalPolicy = "never" | "on-request" | "untrusted";
 
-export type CodexSandboxMode =
-  | "read-only"
-  | "workspace-write"
-  | "danger-full-access";
+export type CodexSandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 
 export type CodexAppServerLaunchConfig = {
   command: string;

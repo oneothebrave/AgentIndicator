@@ -4,8 +4,17 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { settings, inspect } from "./indicator.mjs";
 
-const args = process.argv.slice(2);
-const minutes = args.length === 0 ? 5 : args.length === 2 && args[0] === "--minutes" ? Number(args[1]) : NaN;
+function requestedMinutes(args) {
+  if (args.length === 0) {
+    return 5;
+  }
+  if (args.length === 2 && args[0] === "--minutes") {
+    return Number(args[1]);
+  }
+  return NaN;
+}
+
+const minutes = requestedMinutes(process.argv.slice(2));
 if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
   console.error("用法：npm run stability -- --minutes 720（1–1440 分钟，默认 5 分钟）");
   process.exitCode = 1;
@@ -15,17 +24,26 @@ if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
   await mkdir(directory, { recursive: true });
   const path = resolve(directory, `${new Date().toISOString().replaceAll(":", "-")}.jsonl`);
   const file = await open(path, "wx");
-  let stopped = false, samples = 0, failures = 0, zeroClients = 0;
+  let stopped = false;
+  let samples = 0;
+  let failures = 0;
+  let zeroClients = 0;
   let last = "";
-  process.on("SIGINT", () => { stopped = true; });
-  process.on("SIGTERM", () => { stopped = true; });
-  const started = Date.now(), end = started + minutes * 60000;
+  process.on("SIGINT", () => {
+    stopped = true;
+  });
+  process.on("SIGTERM", () => {
+    stopped = true;
+  });
+  const started = Date.now();
+  const end = started + minutes * 60000;
   console.log(`只读采样 ${minutes} 分钟，每 5 秒一次；日志：${path}`);
   try {
     do {
       const status = await inspect(config);
       const sample = {
-        at: new Date().toISOString(), ready: status.ready,
+        at: new Date().toISOString(),
+        ready: status.ready,
         clients: status.bridgeOK ? status.bridge.clients : null,
         uptimeSeconds: status.bridgeOK ? status.bridge.uptimeSeconds : null,
         memory: status.bridgeOK ? status.bridge.memory : null,
@@ -33,16 +51,38 @@ if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
         accepted: status.hooksOK ? status.hooks.accepted : null,
         ignored: status.hooksOK ? status.hooks.ignored : null,
       };
-      samples++; if (!status.ready) failures++; if (sample.clients === 0) zeroClients++;
+      samples++;
+      if (!status.ready) {
+        failures++;
+      }
+      if (sample.clients === 0) {
+        zeroClients++;
+      }
       await file.write(JSON.stringify(sample) + "\n");
       const key = JSON.stringify([sample.ready, sample.clients]);
-      if (key !== last) { console.log(`[采样] 服务正常=${sample.ready}，客户端=${sample.clients}`); last = key; }
-      if (Date.now() >= end || stopped) break;
+      if (key !== last) {
+        console.log(`[采样] 服务正常=${sample.ready}，客户端=${sample.clients}`);
+        last = key;
+      }
+      if (Date.now() >= end || stopped) {
+        break;
+      }
       await delay(Math.min(5000, end - Date.now()));
     } while (!stopped);
-    const summary = { summary: true, elapsedSeconds: Math.round((Date.now() - started) / 1000), samples, failures, zeroClients, interrupted: stopped };
+    const summary = {
+      summary: true,
+      elapsedSeconds: Math.round((Date.now() - started) / 1000),
+      samples,
+      failures,
+      zeroClients,
+      interrupted: stopped,
+    };
     await file.write(JSON.stringify(summary) + "\n");
     console.log(JSON.stringify(summary));
-    if (failures) process.exitCode = 1;
-  } finally { await file.close(); }
+    if (failures) {
+      process.exitCode = 1;
+    }
+  } finally {
+    await file.close();
+  }
 }

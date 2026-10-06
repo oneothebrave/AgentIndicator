@@ -26,7 +26,9 @@ startBridge(statusSource, {
 });
 
 function createStatusSource(name: string): StatusSource {
-  if (name === "codex-hooks") return createCodexHooksSource();
+  if (name === "codex-hooks") {
+    return createCodexHooksSource();
+  }
   if (name === "mock") {
     return createMockSource({ intervalMs });
   }
@@ -38,10 +40,7 @@ function createStatusSource(name: string): StatusSource {
   throw new Error(`Unsupported AGENT_INDICATOR_SOURCE: ${name}`);
 }
 
-function startBridge(
-  statusSource: StatusSource,
-  config: Omit<BridgeServerConfig, "bridgeSource">,
-) {
+function startBridge(statusSource: StatusSource, config: Omit<BridgeServerConfig, "bridgeSource">) {
   const bridgeServer = createBridgeServer({
     ...config,
     bridgeSource: statusSource.name,

@@ -4,13 +4,13 @@
 // Minimal bring-up using the official M5Unified display API.
 // No servo, camera, microphone, or network activity in this build.
 void setup() {
-  auto cfg = M5.config();
-  cfg.fallback_board = m5::board_t::board_M5StackChan;
-  cfg.internal_imu = false;
-  cfg.internal_rtc = false;
-  cfg.internal_mic = false;
-  cfg.internal_spk = false;
-  M5.begin(cfg);
+  auto config = M5.config();
+  config.fallback_board = m5::board_t::board_M5StackChan;
+  config.internal_imu = false;
+  config.internal_rtc = false;
+  config.internal_mic = false;
+  config.internal_spk = false;
+  M5.begin(config);
   Serial.begin(115200);
   M5.Display.setRotation(1);
   M5.Display.setBrightness(100);
@@ -34,9 +34,8 @@ void loop() {
     M5.Display.fillRect(16, 155, 300, 40, TFT_BLACK);
     M5.Display.setCursor(16, 155);
     M5.Display.printf("Uptime: %lu s", (unsigned long)(millis() / 1000));
-    Serial.printf("screen-demo board=%d display=%dx%d uptime=%lu\n",
-                  (int)M5.getBoard(), M5.Display.width(), M5.Display.height(),
-                  (unsigned long)(millis() / 1000));
+    Serial.printf("screen-demo board=%d display=%dx%d uptime=%lu\n", (int)M5.getBoard(),
+                  M5.Display.width(), M5.Display.height(), (unsigned long)(millis() / 1000));
   }
   delay(10);
 }

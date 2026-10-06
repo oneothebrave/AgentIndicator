@@ -12,14 +12,9 @@ import { useStatusStream } from "./hooks/useStatusStream";
 
 const STATUS_STREAM_URL = "ws://127.0.0.1:8787/status";
 
-type SnapshotAction =
-  | { type: "event"; event: AgentEvent }
-  | { type: "reset"; at: number };
+type SnapshotAction = { type: "event"; event: AgentEvent } | { type: "reset"; at: number };
 
-function snapshotReducer(
-  snapshot: AgentSnapshot,
-  action: SnapshotAction,
-): AgentSnapshot {
+function snapshotReducer(snapshot: AgentSnapshot, action: SnapshotAction): AgentSnapshot {
   switch (action.type) {
     case "event":
       return reduceAgentSnapshot(snapshot, action.event);
@@ -31,11 +26,7 @@ function snapshotReducer(
 }
 
 export default function App() {
-  const [snapshot, dispatch] = useReducer(
-    snapshotReducer,
-    undefined,
-    createInitialSnapshot,
-  );
+  const [snapshot, dispatch] = useReducer(snapshotReducer, undefined, createInitialSnapshot);
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [clock, setClock] = useState(() => new Date());
 

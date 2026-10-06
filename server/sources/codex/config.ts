@@ -18,9 +18,7 @@ export function readCodexSourceConfigFromEnv(): CodexSourceConfig {
       cwd,
     },
     client: {
-      requestTimeoutMs: Number(
-        process.env.AGENT_INDICATOR_CODEX_REQUEST_TIMEOUT_MS ?? 30_000,
-      ),
+      requestTimeoutMs: Number(process.env.AGENT_INDICATOR_CODEX_REQUEST_TIMEOUT_MS ?? 30_000),
     },
     turn: {
       cwd,
@@ -30,10 +28,7 @@ export function readCodexSourceConfigFromEnv(): CodexSourceConfig {
       threadId: process.env.AGENT_INDICATOR_CODEX_THREAD_ID,
       approvalPolicy: readApprovalPolicy(),
       sandbox: readSandboxMode(),
-      waitForClient: readBooleanEnv(
-        "AGENT_INDICATOR_CODEX_WAIT_FOR_CLIENT",
-        true,
-      ),
+      waitForClient: readBooleanEnv("AGENT_INDICATOR_CODEX_WAIT_FOR_CLIENT", true),
     },
     events: {
       messageDeltaThrottleMs: Number(
@@ -94,11 +89,7 @@ function readApprovalPolicy(): CodexApprovalPolicy {
 function readSandboxMode(): CodexSandboxMode {
   const value = process.env.AGENT_INDICATOR_CODEX_SANDBOX;
 
-  if (
-    value === "read-only" ||
-    value === "workspace-write" ||
-    value === "danger-full-access"
-  ) {
+  if (value === "read-only" || value === "workspace-write" || value === "danger-full-access") {
     return value;
   }
 

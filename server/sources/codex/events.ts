@@ -1,16 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { AgentEvent } from "../../../src/domain/agentStatus";
-import {
-  createAgentEventMessage,
-  normalizeAgentEvent,
-} from "../../../src/domain/statusProtocol";
+import { createAgentEventMessage, normalizeAgentEvent } from "../../../src/domain/statusProtocol";
 import type { SendStatusMessage } from "../statusSource";
 import type { JsonRpcServerRequest } from "./jsonRpc";
-import type {
-  CodexAgentEventInput,
-  CodexEventConfig,
-  CodexNotification,
-} from "./types";
+import type { CodexAgentEventInput, CodexEventConfig, CodexNotification } from "./types";
 import { getErrorMessage, getNestedString, getNestedValue } from "./utils";
 import { CodexLifecycle } from "./lifecycle";
 
@@ -40,9 +33,7 @@ export function createCodexEventPublisher({
     if (event.type === "message.delta") {
       const now = Date.now();
 
-      if (
-        isThrottled(now, lastMessageDeltaSentAt, config.messageDeltaThrottleMs)
-      ) {
+      if (isThrottled(now, lastMessageDeltaSentAt, config.messageDeltaThrottleMs)) {
         return;
       }
 
@@ -54,8 +45,13 @@ export function createCodexEventPublisher({
 
   return {
     publishNotificationFromCodex(notification) {
-      const event = lifecycle.notification(notification, mapCodexNotificationToAgentEvent(notification));
-      if (process.env.AGENT_INDICATOR_DEBUG_EVENTS === "1") console.log(`[codex-event] ${notification.method} -> ${event?.type ?? "ignored"}`);
+      const event = lifecycle.notification(
+        notification,
+        mapCodexNotificationToAgentEvent(notification),
+      );
+      if (process.env.AGENT_INDICATOR_DEBUG_EVENTS === "1") {
+        console.log(`[codex-event] ${notification.method} -> ${event?.type ?? "ignored"}`);
+      }
       sendAgentEvent(event);
     },
     publishServerRequestFromCodex(request) {
@@ -67,11 +63,7 @@ export function createCodexEventPublisher({
   };
 }
 
-function isThrottled(
-  now: number,
-  lastSentAt: number,
-  throttleMs: number,
-): boolean {
+function isThrottled(now: number, lastSentAt: number, throttleMs: number): boolean {
   return throttleMs > 0 && now - lastSentAt < throttleMs;
 }
 
@@ -112,7 +104,9 @@ function mapCodexNotificationToInput(
 ): CodexAgentEventInput | undefined {
   switch (notification.method) {
     case "error":
-      if (getNestedValue(notification.params, ["willRetry"]) !== false) return undefined;
+      if (getNestedValue(notification.params, ["willRetry"]) !== false) {
+        return undefined;
+      }
       return {
         type: "turn.failed",
         label: "Error",
@@ -200,15 +194,20 @@ function mapCodexServerRequestToInput(
   }
 }
 
-function mapThreadStatusChanged(
-  params: unknown,
-): CodexAgentEventInput | undefined {
+function mapThreadStatusChanged(params: unknown): CodexAgentEventInput | undefined {
   const status = getNestedString(params, ["status", "type"]);
 
   if (status === "active") {
     const flags = getNestedValue(params, ["status", "activeFlags"]);
-    if (Array.isArray(flags) && flags.some(flag => flag === "waitingOnApproval" || flag === "waitingOnUserInput")) {
-      return { type: "approval.requested", label: "Waiting", detail: "Codex is waiting for approval or input" };
+    if (
+      Array.isArray(flags) &&
+      flags.some((flag) => flag === "waitingOnApproval" || flag === "waitingOnUserInput")
+    ) {
+      return {
+        type: "approval.requested",
+        label: "Waiting",
+        detail: "Codex is waiting for approval or input",
+      };
     }
     return {
       type: "reasoning.started",
@@ -243,10 +242,7 @@ function mapTurnCompleted(params: unknown): CodexAgentEventInput | undefined {
     return {
       type: "turn.failed",
       label: "Error",
-      detail: getErrorMessage(
-        getNestedValue(params, ["turn", "error"]),
-        "Codex turn failed",
-      ),
+      detail: getErrorMessage(getNestedValue(params, ["turn", "error"]), "Codex turn failed"),
     };
   }
 
@@ -258,7 +254,9 @@ function mapTurnCompleted(params: unknown): CodexAgentEventInput | undefined {
     };
   }
 
-  if (status !== "completed") return undefined;
+  if (status !== "completed") {
+    return undefined;
+  }
   return {
     type: "turn.completed",
     label: "Done",
@@ -297,9 +295,7 @@ function mapItemStarted(params: unknown): CodexAgentEventInput | undefined {
     return {
       type: "command.started",
       label: "Running",
-      detail:
-        getNestedString(params, ["item", "command"]) ??
-        "Codex started a command",
+      detail: getNestedString(params, ["item", "command"]) ?? "Codex started a command",
     };
   }
 
@@ -315,7 +311,8 @@ function mapItemStarted(params: unknown): CodexAgentEventInput | undefined {
     itemType === "mcpToolCall" ||
     itemType === "dynamicToolCall" ||
     itemType === "collabAgentToolCall" ||
-    itemType === "imageGeneration" || itemType === "imageView"
+    itemType === "imageGeneration" ||
+    itemType === "imageView"
   ) {
     return {
       type: "tool.started",
