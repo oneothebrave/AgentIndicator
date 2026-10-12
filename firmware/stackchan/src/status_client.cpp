@@ -51,13 +51,11 @@ struct DisplayState {
   const char* origin;
   uint32_t ip;
   const char* presentationState;
-  bool completionSettled;
   uint32_t celebrationGeneration;
 };
 
 QueueHandle_t displayQueue = nullptr;
-DisplayState displayed = {false, false, 0,         nullptr, "Wi-Fi connecting",
-                          "-",   0,     "offline", false,   0};
+DisplayState displayed = {false, false, 0, nullptr, "Wi-Fi connecting", "-", 0, "offline", 0};
 
 void publishDisplayState() {
   DisplayState state = {wifiConnected,
@@ -68,7 +66,6 @@ void publishDisplayState() {
                         origin,
                         wifiConnected ? (uint32_t)WiFi.localIP() : 0,
                         presentation.state(),
-                        presentation.completionSettled(),
                         presentation.celebrationGeneration()};
   xQueueOverwrite(displayQueue, &state);
 }
@@ -102,9 +99,7 @@ void draw() {
   M5.Display.print(protocolReady ? displayed.presentationState : "Offline");
   M5.Display.setTextSize(1);
   M5.Display.setCursor(16, 153);
-  // Keep the real event visible while the presentation has returned to idle.
-  M5.Display.printf("Last: %s  %s", currentEvent ? currentEvent->state : "-",
-                    displayed.completionSettled ? "(done settled)" : "");
+  M5.Display.printf("Last: %s", currentEvent ? currentEvent->state : "-");
   M5.Display.setCursor(16, 164);
   M5.Display.print(currentEvent ? currentEvent->event : "-");
   M5.Display.setCursor(16, 175);
@@ -135,15 +130,15 @@ void receiveMessage(uint8_t* payload, size_t length) {
       setConnection("Protocol error");
       break;
     case MessageKind::Event:
-      if (!presentation.receive(decoded.event, decoded.id, decoded.at, millis())) {
+      if (!presentation.receive(decoded.event, decoded.id, decoded.at)) {
         break;
       }
       currentEvent = decoded.event;
       origin = decoded.origin;
       ++eventCount;
-      Serial.printf("status-client event=%s state=%s display=%s settled=%d origin=%s count=%lu\n",
-                    currentEvent->event, currentEvent->state, presentation.state(),
-                    presentation.completionSettled(), origin, (unsigned long)eventCount);
+      Serial.printf("status-client event=%s state=%s display=%s origin=%s count=%lu\n",
+                    currentEvent->event, currentEvent->state, presentation.state(), origin,
+                    (unsigned long)eventCount);
       break;
     case MessageKind::Ignored:
       break;
@@ -219,8 +214,7 @@ void loop() {
             latest.eventCount != displayed.eventCount ||
             latest.connectionLabel != displayed.connectionLabel || latest.ip != displayed.ip ||
             latest.currentEvent != displayed.currentEvent || latest.origin != displayed.origin;
-    dirty = dirty || latest.presentationState != displayed.presentationState ||
-            latest.completionSettled != displayed.completionSettled;
+    dirty = dirty || latest.presentationState != displayed.presentationState;
     displayed = latest;
   }
   head.update(displayed.protocolReady, displayed.presentationState);
@@ -295,9 +289,6 @@ void networkTask(void*) {
       WiFi.reconnect();
     }
 
-    if (presentation.tick(millis())) {
-      Serial.println("presentation state=idle last=done reason=completion-settled");
-    }
     publishDisplayState();
     vTaskDelay(pdMS_TO_TICKS(5));
   }

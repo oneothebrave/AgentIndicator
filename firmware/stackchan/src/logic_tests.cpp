@@ -195,68 +195,70 @@ static void presentationTests() {
   const auto done = findEventState("turn.completed");
   const auto thinking = findEventState("turn.started");
   CHECK(!strcmp(policy.state(), "offline"));
-  CHECK(!policy.receive(done, "before-hello", 101, 0));
+  CHECK(!policy.receive(done, "before-hello", 101));
   policy.hello(100);
   CHECK(!strcmp(policy.state(), "idle"));
-  CHECK(policy.receive(done, "first-live", 101, 1000));
+  CHECK(policy.receive(done, "first-live", 101));
   CHECK(!strcmp(policy.state(), "done"));
   CHECK(policy.celebrationGeneration() == 1);
-  CHECK(!policy.tick(5999));
-  CHECK(!policy.receive(done, "first-live", 101, 5999));
-  CHECK(policy.tick(6000));
-  CHECK(!strcmp(policy.state(), "idle"));
+  CHECK(!policy.receive(done, "first-live", 101));
+  CHECK(!strcmp(policy.state(), "done"));
   CHECK(policy.lastEvent() == done);
-  CHECK(policy.completionSettled());
-  CHECK(!policy.tick(7000));
-  CHECK(!policy.receive(done, "first-live", 101, 8000));
-  CHECK(!strcmp(policy.state(), "idle"));
+  CHECK(policy.celebrationGeneration() == 1);
 
-  CHECK(policy.receive(done, "next-live", 102, 9000));
+  CHECK(policy.receive(done, "next-live", 102));
   CHECK(policy.celebrationGeneration() == 2);
-  CHECK(!policy.completionSettled());
-  CHECK(policy.receive(thinking, "new-turn", 103, 10000));
-  CHECK(!policy.tick(14000));
+  CHECK(policy.receive(thinking, "new-turn", 103));
+  CHECK(!policy.receive(done, "next-live", 102));
   CHECK(!strcmp(policy.state(), "thinking"));
   for (const char* type : {"approval.requested", "turn.failed", "command.started", "thread.idle"}) {
-    CHECK(policy.receive(done, type, 110, 20000));
+    CHECK(policy.receive(done, type, 110));
     const auto next = findEventState(type);
-    CHECK(policy.receive(next, "preempt", 111, 22000));
-    CHECK(!policy.tick(30000));
+    CHECK(policy.receive(next, "next-event", 111));
     CHECK(!strcmp(policy.state(), next->state));
+    CHECK(policy.lastEvent() == next);
   }
 
-  CHECK(policy.receive(done, "disconnect-live", 112, 31000));
+  CHECK(policy.receive(done, "disconnect-live", 112));
+  const auto generation = policy.celebrationGeneration();
   policy.disconnect();
   CHECK(!strcmp(policy.state(), "offline"));
-  CHECK(!policy.tick(50000));
   policy.hello(200);
-  CHECK(policy.receive(done, "disconnect-live", 112, 50000));
-  CHECK(!strcmp(policy.state(), "idle"));
-  CHECK(policy.completionSettled());
+  CHECK(policy.receive(done, "disconnect-live", 112));
+  CHECK(!strcmp(policy.state(), "done"));
   CHECK(policy.lastEvent() == done);
+  CHECK(policy.celebrationGeneration() == generation);
   policy.hello(300);
-  CHECK(policy.receive(done, "unknown-old-snapshot", 299, 60000));
-  CHECK(!strcmp(policy.state(), "idle"));
+  CHECK(policy.receive(done, "unknown-old-snapshot", 299));
+  CHECK(!strcmp(policy.state(), "done"));
+  CHECK(policy.celebrationGeneration() == generation);
   policy.hello(400);
-  CHECK(policy.receive(done, "equal-clock-snapshot", 400, 61000));
-  CHECK(!strcmp(policy.state(), "idle"));
+  CHECK(policy.receive(done, "equal-clock-snapshot", 400));
+  CHECK(!strcmp(policy.state(), "done"));
+  CHECK(policy.celebrationGeneration() == generation);
   policy.hello(500);
-  CHECK(policy.receive(done, "new-after-hello", 501, 0xfffffff0u));
-  CHECK(!policy.tick(0x00001377u));
-  CHECK(policy.tick(0x00001378u));
-  CHECK(!strcmp(policy.state(), "idle"));
+  CHECK(policy.receive(done, "new-after-hello", 501));
+  CHECK(!strcmp(policy.state(), "done"));
+  CHECK(policy.celebrationGeneration() == generation + 1);
 
-  // The derived idle state, rather than the raw completion, controls the head.
+  // Elapsed time cannot turn completion into idle or lower the head.
   HeadPolicy head;
   head.configure(591, 599, true);
   head.next(0, true, "thinking");
   CHECK(head.next(350, true, "thinking") == 655);
   head.succeeded(655);
   CHECK(head.next(1000, true, "done") == -1);
-  CHECK(head.next(5000, true, policy.state()) == -1);
-  CHECK(head.next(5350, true, policy.state()) == 591);
-  CHECK(!policy.receive(nullptr, "bad", 600, 0));
-  CHECK(!policy.receive(done, nullptr, 600, 0));
+  for (const uint32_t now : {5999u, 6000u, 60000u, 600000u, 0xffffffffu}) {
+    CHECK(!strcmp(policy.state(), "done"));
+    CHECK(policy.lastEvent() == done);
+    CHECK(head.next(now, true, policy.state()) == -1);
+  }
+  CHECK(policy.receive(findEventState("thread.idle"), "real-idle", 600));
+  CHECK(!strcmp(policy.state(), "idle"));
+  CHECK(head.next(10000, true, policy.state()) == -1);
+  CHECK(head.next(10350, true, policy.state()) == 591);
+  CHECK(!policy.receive(nullptr, "bad", 600));
+  CHECK(!policy.receive(done, nullptr, 600));
 }
 
 void setup() {

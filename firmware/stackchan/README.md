@@ -1,9 +1,12 @@
 # StackChan 固件
 
 目标设备 M5StackChan ESP32-S3，320×240 横屏、16MB Flash、Quad PSRAM。
-当前源码和本机设备固件为 `2026.10.06-r1`，默认环境为 status-client。
+当前源码固件为 `2026.10.07-r1`，默认环境为 status-client。
+2026-10-12 已烧录当前版本，设备逻辑测试 194 条断言全部通过，串口版本与头部故障状态已确认。
+设备当前未连接已配置的 Wi-Fi，联网事件回放仍待验收。
 USB 用于烧录/串口，日常状态通过 Wi-Fi WebSocket 获取；电脑端运行 `npm start` 和普通 Codex CLI。
-本轮烧录与回归依据见 [2026-10-06 验收](../../docs/fix-validation-2026-10-06.md)。
+本轮烧录与回归依据见 [2026-10-12 验收](../../docs/fix-validation-2026-10-12.md)；
+旧的 5 秒完成收尾实机记录见 [2026-10-06 历史验收](../../docs/fix-validation-2026-10-06.md)。
 
 ## 正式行为
 
@@ -16,21 +19,20 @@ USB 用于烧录/串口，日常状态通过 Wi-Fi WebSocket 获取；电脑端�
 | thinking | 左右上方交替看，镜像思绪点，工作抬头 20° |
 | running | 只写一行；银色笔迹，视线跟随，抬眼回正后重写 |
 | waiting | 琥珀眼左右看，呼吸点，保持头部目标 |
-| done | 左眼眨一次；笑眼 5 秒后展示 idle 并回平 |
+| done | 左眼眨一次；保持笑眼和已有头部目标，直到收到新事件 |
 | error | 深红 xx，轻摇一次后保持已有目标 |
 | offline | 灰色插头眼、插座眼和心电图嘴巴，回平 |
 
 editing/tool 使用执行造型，searching/speaking 使用思考，sleepy/sleep 使用空闲。
 不进入芯片深睡眠，不启用扬声器。几何和调色板见 [设计规范](../../docs/design/expression-design.md)。
 
-完成收尾只改变设备展示，不改 bridge 最近真实事件或会话绑定。
-调试页大字显示当前展示，Last 保留原始状态与事件类型；完成收尾后为 idle / Last: done (done settled)。
-新活动、等待、异常、真实 idle、断线抢占完成计时。最近 32 个完成 ID 去重。
-重连首个完成若 at 不晚于 hello.at，或 ID 已庆祝，立即展示 idle；不会重播旧庆祝。
-新实时完成可重置左眼庆祝。thinking/running/waiting/error 没有静默超时。
+所有 Agent 状态按最近接受的事件展示，没有完成计时或静默超时。
+调试页大字与 Last 使用同一真实状态，断线时展示 offline。
+最近 32 个完成 ID 去重；重复完成不会覆盖后续状态。
+重连首个完成快照仍展示 done，不会替换为 idle；新实时完成可重置左眼庆祝。
 
 头部策略只控制 ID 2，水平基准本机为 591、工作为 655（约 20°）。
-完成收尾后按现有 350ms 稳定门槛和 900ms 移动回平；无有效校准不运动。
+done 保持已有目标，收到真实 idle 或断线后按 350ms 稳定门槛和 900ms 移动回平；无有效校准不运动。
 限位、最多 3 次故障重试和串口命令见 [头部说明](../../docs/head-motion.md)。
 
 ## 配置与协议
@@ -77,7 +79,7 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 ## 固件回归
 
 logic-test 在 ESP32 上运行纯头部策略、动画关键帧、协议解析和完成展示策略。
-不初始化舵机、Wi-Fi、NVS。当前为 183 条断言，必须读取 failures=0；结束后恢复正式固件。
+不初始化舵机、Wi-Fi、NVS。本轮运行 194 条断言、0 失败；结束后已恢复正式固件。
 
 ```powershell
 $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
@@ -87,8 +89,8 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 .tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --seconds 5 --send v
 ```
 
-完成计时覆盖 5 秒边界、抢占、去重、快照和 millis 回绕；头部策略仍保持 20°限位。
-本轮受控 WebSocket 回放与串口实机验证不替代真实模型调用、路由器断网或机械故障注入。
+事件驱动展示覆盖完成保持、新事件切换、去重、重连快照与完成期间头部保持；头部策略仍保持 20°限位。
+本轮逻辑回归和串口实机验证不替代联网事件回放、真实模型调用、路由器断网或机械故障注入。
 有效 12 小时采样与专项物理验收仍列在 [开发计划](../../docs/development-plan.md)。
 
 参考：[StackChan Core](https://docs.m5stack.com/en/core/StackChan_Core)、

@@ -3,10 +3,9 @@
 #include <string.h>
 #include "event_states.h"
 
-// Device presentation is independent of the last real Agent event.
+// Agent presentation follows the last accepted event; connection loss overrides it.
 class PresentationPolicy {
  public:
-  static constexpr uint32_t DONE_HOLD_MS = 5000;
   static constexpr size_t MAX_EVENT_ID_BYTES = 256;
   static constexpr size_t REMEMBERED_COMPLETIONS = 32;
 
@@ -15,20 +14,14 @@ class PresentationPolicy {
     awaitingSnapshot = true;
     helloAt = bridgeAt;
     rawEvent = nullptr;
-    presentationState = "idle";
-    holdingDone = false;
-    settledDone = false;
   }
 
   void disconnect() {
     connected = false;
     awaitingSnapshot = false;
-    holdingDone = false;
-    settledDone = false;
-    presentationState = "offline";
   }
 
-  bool receive(const EventState* event, const char* id, double at, uint32_t now) {
+  bool receive(const EventState* event, const char* id, double at) {
     if (!connected || !event || !id || strlen(id) > MAX_EVENT_ID_BYTES) {
       return false;
     }
@@ -45,32 +38,14 @@ class PresentationPolicy {
     }
 
     rawEvent = event;
-    holdingDone = false;
-    settledDone = false;
-    presentationState = event->state;
     if (completed) {
       if (!duplicate) {
         remember(id);
       }
-      if (historical) {
-        presentationState = "idle";
-        settledDone = true;
-      } else {
-        holdingDone = true;
-        doneStartedAt = now;
+      if (!historical) {
         ++animationGeneration;
       }
     }
-    return true;
-  }
-
-  bool tick(uint32_t now) {
-    if (!connected || !holdingDone || now - doneStartedAt < DONE_HOLD_MS) {
-      return false;
-    }
-    holdingDone = false;
-    settledDone = true;
-    presentationState = "idle";
     return true;
   }
 
@@ -79,11 +54,10 @@ class PresentationPolicy {
   }
 
   const char* state() const {
-    return presentationState;
-  }
-
-  bool completionSettled() const {
-    return settledDone;
+    if (!connected) {
+      return "offline";
+    }
+    return rawEvent ? rawEvent->state : "idle";
   }
 
   uint32_t celebrationGeneration() const {
@@ -93,13 +67,9 @@ class PresentationPolicy {
  private:
   bool connected = false;
   bool awaitingSnapshot = false;
-  bool holdingDone = false;
-  bool settledDone = false;
   double helloAt = 0;
-  uint32_t doneStartedAt = 0;
   uint32_t animationGeneration = 0;
   const EventState* rawEvent = nullptr;
-  const char* presentationState = "offline";
   char completions[REMEMBERED_COMPLETIONS][MAX_EVENT_ID_BYTES + 1] = {};
   size_t nextCompletion = 0;
   size_t completionCount = 0;

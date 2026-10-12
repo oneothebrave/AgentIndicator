@@ -170,6 +170,10 @@ async function localChecks(config) {
     join(root, ".codex", "hooks.json"),
     join(process.env.CODEX_HOME || join(homedir(), ".codex"), "hooks.json"),
   ];
+  console.log(`[配置] 项目根目录：${root}`);
+  for (const [index, path] of locations.entries()) {
+    console.log(`[配置] ${index === 0 ? "项目" : "用户级"} hooks 路径：${path}`);
+  }
   for (const [index, path] of locations.entries()) {
     try {
       const parsed = JSON.parse(await readFile(path, "utf8"));
