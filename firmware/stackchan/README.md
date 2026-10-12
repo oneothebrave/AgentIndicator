@@ -5,8 +5,8 @@
 2026-10-12 已烧录当前版本，设备逻辑测试 194 条断言全部通过，串口版本与头部故障状态已确认。
 设备当前未连接已配置的 Wi-Fi，联网事件回放仍待验收。
 USB 用于烧录/串口，日常状态通过 Wi-Fi WebSocket 获取；电脑端运行 `npm start` 和普通 Codex CLI。
-本轮烧录与回归依据见 [2026-10-12 验收](../../docs/fix-validation-2026-10-12.md)；
-旧的 5 秒完成收尾实机记录见 [2026-10-06 历史验收](../../docs/fix-validation-2026-10-06.md)。
+本轮烧录与回归依据见 [2026-10-12 验收](../../docs/fix-validation-2026-10-12.md)。
+换电脑的配置、工具恢复和备份信息见 [HANDOFF.md](../../HANDOFF.md)。
 
 ## 正式行为
 
@@ -63,16 +63,29 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 ```
 
 本机端口 COM3；更换设备先核对芯片并备份原始 Flash 到 .tmp/hardware-backups。
-备份含配网信息，不提交或上传。本机原始备份记录保留在 [历史归档](../../docs/history/stackchan-readme-before-2026-10-06.md)。
+备份含配网信息，不提交或上传。原厂及升级前完整备份的文件名、大小和 SHA-256
+见 [接力说明](../../HANDOFF.md)；备份本身不随 Git 迁移。
+
+烧录新设备或需保留烧录前状态时，先执行以下备份；COM3 改为实际端口，
+时间戳文件名避免覆盖已有备份：
+
+```powershell
+New-Item -ItemType Directory -Force .tmp/hardware-backups | Out-Null
+$backupFile = ".tmp/hardware-backups/stackchan-before-$(Get-Date -Format 'yyyyMMdd-HHmmss').bin"
+.tmp/hardware-venv/Scripts/python.exe -m esptool --port COM3 flash-id
+.tmp/hardware-venv/Scripts/python.exe -m esptool --port COM3 --baud 460800 read-flash 0 ALL $backupFile
+Get-FileHash -Algorithm SHA256 -LiteralPath $backupFile
+```
 
 ```powershell
 $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e status-client
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e status-client -t upload --upload-port COM3
-.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --seconds 5 --send v
+.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --port COM3 --seconds 5 --send v
 ```
 
 串口版本、head level/target/raw/automatic/fault 可确认固件和姿态策略。
+上传和读取命令中的 COM3 均需替换为实际端口。
 写入哈希校验不代替目视确认。screen-demo 只用于首轮屏幕 bring-up，须显式 -e screen-demo，
 它显示标题、RGB 色块和 Uptime，不接日常状态。
 
@@ -84,9 +97,9 @@ logic-test 在 ESP32 上运行纯头部策略、动画关键帧、协议解析�
 ```powershell
 $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e logic-test -t upload --upload-port COM3
-.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --seconds 5 --expect 'failures=0'
+.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --port COM3 --seconds 5 --expect 'LOGIC_TEST_RESULT checks=194 failures=0'
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e status-client -t upload --upload-port COM3
-.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --seconds 5 --send v
+.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --port COM3 --seconds 5 --send v
 ```
 
 事件驱动展示覆盖完成保持、新事件切换、去重、重连快照与完成期间头部保持；头部策略仍保持 20°限位。

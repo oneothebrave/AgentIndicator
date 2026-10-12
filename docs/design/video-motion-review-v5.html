@@ -100,8 +100,8 @@
         沿用视频里的银灰胶囊眼与带停顿的动作，用视线方向、眼形和节奏区分空闲、思考、执行、等待、完成与异常。
       </p>
       <p class="small">
-        已确认 v5：在已烧录 v4 上再放大
-        20%，思考气泡移到外上侧；补充离线表情。本页为正式固件设计基准。按钮可对比设备上的 v4 尺寸。
+        当前正式方案为银色 v5：相对历史 v4 尺寸再放大
+        20%，思考气泡移到外上侧；补充离线表情。本页为正式固件设计基准。按钮可对比历史 v4 尺寸。
       </p>
       <div id="modes">
         <button data-mode="idle" aria-pressed="true">空闲</button
@@ -201,7 +201,7 @@
           <strong id="label">空闲</strong>
           <p id="description"></p>
           <p class="small" id="timing"></p>
-          <button id="size" aria-pressed="true">对比已烧录 v4</button
+          <button id="size" aria-pressed="true">对比 v4 尺寸</button
           ><button id="pause">暂停动画</button><button id="shape">查看圆屏构图</button>
           <p class="small">按当前设备 320×240 横屏设计；圆形仅用于与参考视频比较。</p>
         </div>
@@ -286,7 +286,7 @@
           "入场轻摇约 550 ms · 振幅不超过 4 px · 随后静止",
         ],
       };
-      let enlarged = true; // true: v5; false: flashed v4
+      let enlarged = true; // true: current v5; false: historical v4 dimensions
       let mode = "offline";
       let clock = 0;
       let last = 0;
@@ -729,7 +729,7 @@
       };
       $("size").onclick = () => {
         enlarged = !enlarged;
-        $("size").textContent = enlarged ? "对比已烧录 v4" : "查看 v5 再放大 20%";
+        $("size").textContent = enlarged ? "对比 v4 尺寸" : "查看 v5 再放大 20%";
         $("size").setAttribute("aria-pressed", String(enlarged));
         if (paused) {
           draw(0, true);

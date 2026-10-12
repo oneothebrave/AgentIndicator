@@ -11,7 +11,8 @@ npm start
 codex
 ```
 
-本机已安装并审核项目通知 hooks。无需测试 prompt。
+首次使用或换电脑时，先安装通知 hooks 并在 CLI 的 `/hooks` 审核信任，详见下方安装说明。
+正常交互式使用无需测试 prompt。
 `npm start` 强制选择 codex-hooks，旧 SOURCE 环境变量不会误启动 app-server。
 状态服务默认监听 0.0.0.0:8787，hooks 只监听 127.0.0.1:8788。
 机器人连接 `ws://<电脑局域网IP>:8787/status`。
@@ -112,7 +113,7 @@ Invoke-RestMethod http://127.0.0.1:8787/health
 诊断输出服务来源、候选 IPv4、客户端数、最新事件、绑定与两类监听器状态。
 cliObserver 显示 unbound（待活动）、watching（进程已验证）、unidentified、unsupported
 或 degraded。terminalObserver 单独描述 transcript 错误补充监听。
-CLI 退出恢复验证见 [2026-10-06 记录](fix-validation-2026-10-06.md)；
+此前 CLI 退出恢复验证及当前验收边界见 [接力说明](../HANDOFF.md)；
 当前固件烧录与回归见 [2026-10-12 记录](fix-validation-2026-10-12.md)。
 
 客户端数不含设备身份，不能区分浏览器和机器人，也不能证明 LCD 已绘制。
@@ -131,22 +132,22 @@ bridge 每 30 秒 ping，未回应连接通常在 30–60 秒清理。
 该 transcript 格式是版本适配，不是稳定公共协议；更换 Codex 后需核对。
 error 不因静默超时退回；新任务或 CLI 真实退出才能改变它。
 
-## 安装、采集与历史
+## 安装与采集
 
 `npm run hooks:install` 合并项目 .codex/hooks.json 并备份变化，保留无关处理器。
-在 CLI 的 /hooks 审核信任；本机原有通知命令路径不变，本轮无需重新安装定义。
-移动项目或更换 Node 路径后重新检查。用户级安装使用 --global，不能同时保留两份。
+在 CLI 的 /hooks 审核信任。定义包含 Node 和通知脚本的绝对路径，换电脑后重新生成，
+不要直接复制旧配置。移动项目或更换 Node 路径后检查旧条目；安装器只匹配当前命令，
+旧路径条目需要从原位置卸载或人工移除。用户级安装使用 --global，不能同时保留两份。
 卸载使用 --uninstall，用户级卸载加 --global。
+
+用户级文件位于 `CODEX_HOME/hooks.json`，未设置 `CODEX_HOME` 时位于用户目录的 `.codex/hooks.json`。
+项目级仅覆盖对应项目，用户级可接收其他项目 CLI 的通知。安装范围、信任和会话绑定
+均会影响机器人是否响应；换电脑的完整步骤见 [HANDOFF.md](../HANDOFF.md)。
 
 `AGENT_INDICATOR_DEBUG_EVENTS=1` 启用脱敏逐事件诊断。
 `npm run events:capture -- 60` 采集统一流。
 `npm run stability -- --minutes 720` 每 5 秒只读采样，电脑须保持唤醒；
 只有完整 summary 和实际连续时长能证明 12 小时跑完，短测不能代替。
-
-历史实测见 [2026-09-07 稳定性记录](stability-validation.md)、
-[2026-09-09 修复记录](fix-validation-2026-09-09.md) 与
-[2026-09-29 维护记录](fix-validation-2026-09-29.md)。历史中的“自动退出未实现”
-和“缺少 ID 审批必保持到 Stop”已由后续实现更新。
 
 参考：[官方 Codex Hooks](https://learn.chatgpt.com/docs/hooks)、
 [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes)、
