@@ -1,17 +1,17 @@
 # Agent Indicator 接力说明
 
-更新日期：2026-10-12。本文供迁移电脑后的使用者及后续开发者接力。
+更新日期：2026-10-15。本文供迁移电脑后的使用者及后续开发者接力。
 日常安装见 [README](README.md)，功能待办见 [开发计划](docs/development-plan.md)。
 
 ## 1. 先看当前结论
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 仓库 | [oneothebrave/AgentIndicator](https://github.com/oneothebrave/AgentIndicator)，分支 `main` |
-| 功能基线 | `ffe7102`：移除完成后的自动 idle，已提交并推送；本次交接整理只改文档 |
-| 正式固件 | 源码及现有机器人均为 `2026.10.07-r1`，2026-10-12 已烧录 |
+| 仓库 | [oneothebrave/Willump](https://github.com/oneothebrave/Willump)，分支 `main` |
+| 功能基线 | 事件驱动与完成保持沿用 `ffe7102`；本轮更新威朗普七态及离线叉眼笑脸 |
+| 正式固件 | 源码及现有机器人均为 `2026.10.15-r1`，2026-10-15 已烧录 |
 | 硬件 | 现有 M5StackChan ESP32-S3 rev v0.2，16MB Flash，320×240，Quad PSRAM；旧电脑端口 COM3 |
-| 表情/运动 | 银色 motion-eyes-v5，六种工作表情加 offline；工作抬头约 20° |
+| 表情/运动 | 威朗普 willump-led-v3，六种工作表情加离线叉眼笑脸；工作抬头约 20° |
 | 当前阻碍 | 机器人未连接已配置 Wi-Fi，最新串口为 `wifi-retry status=1 saved-wifi=0`；联网回放未完成 |
 | 电脑端运行 | 迁移前交接检查未检测到可用日常 bridge；新电脑需执行 `npm start` |
 | 下一步 | 配置新电脑地址及 Wi-Fi，恢复真实 CLI → bridge → 机器人链路，再做联网验收 |
@@ -51,8 +51,8 @@ Codex 的账号登录、配置和 hooks 信任需要在新电脑单独确认。
 ### 3.1 克隆和安装
 
 ```powershell
-git clone https://github.com/oneothebrave/AgentIndicator.git
-cd AgentIndicator
+git clone https://github.com/oneothebrave/Willump.git
+cd Willump
 git status --short
 npm ci
 codex --version
@@ -142,7 +142,7 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 ```powershell
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e status-client
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e status-client -t upload --upload-port COM3
-.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --port COM3 --seconds 5 --send v --expect 'firmware version=2026.10.07-r1'
+.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --port COM3 --seconds 5 --send v --expect 'firmware version=2026.10.15-r1'
 ```
 
 本项目只控制 ID 2 俯仰舵机。现有机器人的原厂 zero=599，人工水平 level=591，
@@ -158,7 +158,13 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 
 ## 5. 已验证什么，尚未验证什么
 
-最近一次代码及烧录验收为 **2026-10-12**，详见 [验收记录](docs/fix-validation-2026-10-12.md)：
+最新离线表情及烧录验收为 **2026-10-15**，371 条设备逻辑断言通过，详见 [离线叉眼笑脸验收](docs/offline-validation-2026-10-15.md)。
+本轮完整 Flash 备份为 `.tmp/hardware-backups/stackchan-before-offline-20261015-01.bin`，大小 16,777,216 字节，SHA-256 为 `FACE11B1C8685607A9B021CE76ACA853CFD0A30F47C8795540D8DC9D0FBA5A48`。
+
+此前七态表情及烧录验收为 **2026-10-13**，373 条设备逻辑断言通过，详见 [威朗普验收](docs/willump-validation-2026-10-13.md)。
+新增完整 Flash 备份为 `.tmp/hardware-backups/stackchan-before-willump-20261013-01.bin`，大小 16,777,216 字节，SHA-256 为 `72180EB829B6F8A439CB992F0947244642202676B350CF0ADAFC2C60F64A602A`。
+
+下表保留 **2026-10-12** 的历史验收，详见 [验收记录](docs/fix-validation-2026-10-12.md)：
 
 | 验证 | 结果和范围 |
 | --- | --- |
@@ -210,7 +216,7 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 - Windows CLI 退出检测使用 PID、创建时间和只读句柄，500ms 检查周期；身份不明或权限不足时降级，
   使用 `doctor` / `session:reset`，不以“没有活动”猜测退出。已识别的 Desktop/app-server/exec 通知不抢占交互 CLI。
 - app-server 开发来源创建/管理自己的任务，不监听现有 Desktop 或另一终端里的 CLI。
-- 继续使用 v5 银色造型与六态加离线，不恢复旧候选设计、完成计时、前端手动 mock 控制或 legacy 协议分支。
+- 继续使用 willump-led-v3 威朗普造型与六态加离线，不恢复旧候选设计、完成计时、前端手动 mock 控制或 legacy 协议分支。
 
 ## 8. 代码与文档入口
 

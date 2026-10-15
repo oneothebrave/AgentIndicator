@@ -1,27 +1,27 @@
 # StackChan 固件
 
 目标设备 M5StackChan ESP32-S3，320×240 横屏、16MB Flash、Quad PSRAM。
-当前源码固件为 `2026.10.07-r1`，默认环境为 status-client。
-2026-10-12 已烧录当前版本，设备逻辑测试 194 条断言全部通过，串口版本与头部故障状态已确认。
-设备当前未连接已配置的 Wi-Fi，联网事件回放仍待验收。
+当前源码固件为 `2026.10.15-r1`，默认环境为 status-client。
+2026-10-15 已烧录 willump-led-v3，设备逻辑测试 371 条断言全部通过；串口确认版本、帧缓冲和校准保留。
+设备仍未连接已配置的 Wi-Fi，联网表情回放和实屏观感待验收。
 USB 用于烧录/串口，日常状态通过 Wi-Fi WebSocket 获取；电脑端运行 `npm start` 和普通 Codex CLI。
-本轮烧录与回归依据见 [2026-10-12 验收](../../docs/fix-validation-2026-10-12.md)。
+本轮烧录与回归依据见 [2026-10-15 验收](../../docs/offline-validation-2026-10-15.md)。
 换电脑的配置、工具恢复和备份信息见 [HANDOFF.md](../../HANDOFF.md)。
 
 ## 正式行为
 
-银色 motion-eyes-v5，联网六态加灰色离线。点击切换表情页和调试页。
+威朗普 willump-led-v3，联网六态加离线叉眼笑脸。点击切换表情页和调试页。
 网络在独立 core 0 任务中运行，UI 不等待同步 TCP 重连；快照通过单槽覆盖队列传递。
 
 | 状态 | 表现 |
 | --- | --- |
-| idle | 银色胶囊眼，偶尔侧看和眨眼，头部水平 |
-| thinking | 左右上方交替看，镜像思绪点，工作抬头 20° |
-| running | 只写一行；银色笔迹，视线跟随，抬眼回正后重写 |
-| waiting | 琥珀眼左右看，呼吸点，保持头部目标 |
-| done | 左眼眨一次；保持笑眼和已有头部目标，直到收到新事件 |
-| error | 深红 xx，轻摇一次后保持已有目标 |
-| offline | 灰色插头眼、插座眼和心电图嘴巴，回平 |
+| idle | 青蓝弧眼、方块笑嘴，偶尔侧看和眨眼，头部水平 |
+| thinking | 短横眼、矩形嘴空心/实心开合，工作抬头 20° |
+| running | 两侧竖板上下移动，小球触板后反向 |
+| waiting | 青蓝方眼、平嘴，偶尔眨眼，保持头部目标 |
+| done | 招牌笑眼、宽笑嘴，左眼眨一次；保持表情和已有头部目标直到新事件 |
+| error | 红底尖括号眼、短横嘴，轻摇一次后保持已有目标 |
+| offline | 青蓝叉眼和弧形笑嘴，固定显示，头部回平 |
 
 editing/tool 使用执行造型，searching/speaking 使用思考，sleepy/sleep 使用空闲。
 不进入芯片深睡眠，不启用扬声器。几何和调色板见 [设计规范](../../docs/design/expression-design.md)。
@@ -92,12 +92,12 @@ $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 ## 固件回归
 
 logic-test 在 ESP32 上运行纯头部策略、动画关键帧、协议解析和完成展示策略。
-不初始化舵机、Wi-Fi、NVS。本轮运行 194 条断言、0 失败；结束后已恢复正式固件。
+不初始化舵机、Wi-Fi、NVS。本轮运行 371 条断言、0 失败；结束后已恢复正式固件。
 
 ```powershell
 $env:PLATFORMIO_CORE_DIR = "$PWD/.tmp/platformio"
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e logic-test -t upload --upload-port COM3
-.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --port COM3 --seconds 5 --expect 'LOGIC_TEST_RESULT checks=194 failures=0'
+.tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --port COM3 --seconds 5 --expect 'LOGIC_TEST_RESULT checks=371 failures=0'
 .tmp/hardware-venv/Scripts/python.exe -m platformio run -d firmware/stackchan -e status-client -t upload --upload-port COM3
 .tmp/hardware-venv/Scripts/python.exe scripts/read-device.py --port COM3 --seconds 5 --send v
 ```

@@ -94,41 +94,70 @@ static void headTests() {
 
 static void motionTests() {
   using namespace FaceMotion;
-  CHECK(INK == 0xb8bdc4);
-  CHECK(ERROR == 0xb51f32);
-  CHECK(OFFLINE == 0x808080);
-  auto idle = target("idle", 0);
-  CHECK(near(idle.width, 29.64f));
+  CHECK(INK == 0x49d9ff);
+  CHECK(BG == 0x060e18);
+  CHECK(ERROR_BG == 0x230913);
+  CHECK(ERROR == 0xff775c);
+  CHECK(OFFLINE == INK);
+  const auto idle = target("idle", 0);
   CHECK(near(idle.left, 67.08f));
-  auto right = target("thinking", .8f);
-  auto left = target("thinking", 4.3f);
-  CHECK(near(right.x, 23));
-  CHECK(near(left.x, -23));
-  CHECK(near(left.y, -22));
-  CHECK(near(right.left, left.right));
-  CHECK(near(right.right, left.left));
-  CHECK(near(WRITE_SECONDS, 1.6666667f));
-  CHECK(near(writingPhase(WRITE_SECONDS), 2));
-  CHECK(near(writingPhase(WRITE_PERIOD + .01f), .012f));
-  float x;
-  float y;
-  writtenPoint(writingPhase(.8f), x, y);
-  auto writing = target("running", .8f);
-  CHECK(near(writing.x, (x - 156) * .95f));
-  auto glance = target("running", 3.f);
-  CHECK(glance.x < 0 && glance.y < 0);
-  auto nextGlance = target("running", WRITE_PERIOD + 3.f);
-  CHECK(nextGlance.x > 0 && nextGlance.y < 0);
+  CHECK(near(idle.right, 67.08f));
+  CHECK(near(idle.y, -2));
+  CHECK(near(target("idle", 2.5f).x, 8));
+  CHECK(near(target("idle", 4.f).x, 0));
   CHECK(wink(0) == 0);
   CHECK(wink(.99f) > .99f);
   CHECK(wink(1.5f) == 0);
   CHECK(wink(9) == 0);
   CHECK(target("done", 10).happy == 1);
-  CHECK(target("error", 10).failed == 1);
-  CHECK(target("waiting", 1).x < 0);
-  CHECK(target("waiting", 3).x > 0);
+  CHECK(near(target("done", .3f).y, -4));
+  CHECK(near(target("done", .6f).y, 0));
+  CHECK(near(blink(5.29f), 0));
+  CHECK(near(blink(5.5f), 1));
+  CHECK(near(blink(6.29f, 6.8f, 6.29f), 0));
+  CHECK(near(mouthOpening(0), 1));
+  CHECK(near(mouthOpening(.55f), 1));
+  CHECK(near(mouthOpening(1.2f), 0));
+  CHECK(near(mouthOpening(THINK_PERIOD), 1));
+  CHECK(mouthHeight(0) == 13);
+  CHECK(mouthHeight(1.2f) == 4);
+  CHECK(mouthOpening(.72f) > 0 && mouthOpening(.72f) < 1);
+  CHECK(errorOffset(.6f) == 0);
+  CHECK(errorOffset(10) == 0);
+  CHECK(near(reflected(-.2f, 1), .2f));
+  CHECK(near(pongAt(0).x, 76));
+  CHECK(near(pongAt(0).y, 100));
+  CHECK(near(pongAt(FLIGHT_SECONDS).x, 240));
+  CHECK(near(pongAt(FLIGHT_SECONDS).y, 181.2f));
+  for (int index = 0; index < 40; index++) {
+    const float t = index * FLIGHT_SECONDS;
+    const auto impact = pongAt(t);
+    const bool right = index % 2;
+    CHECK(near(impact.x, right ? 240 : 76));
+    CHECK(near(impact.y, right ? impact.rightY : impact.leftY));
+    CHECK(right ? pongAt(t - .001f).x < impact.x : pongAt(t - .001f).x > impact.x);
+    CHECK(right ? pongAt(t + .001f).x < impact.x : pongAt(t + .001f).x > impact.x);
+  }
+  bool ballInBounds = true;
+  bool paddlesInBounds = true;
+  bool mouthInBounds = true;
+  for (int index = 0; index < 2000; index++) {
+    const float t = index * .014f;
+    const auto pong = pongAt(t);
+    ballInBounds &= pong.x >= 75.99f && pong.x <= 240.01f && pong.y >= 51.99f && pong.y <= 188.01f;
+    paddlesInBounds &= pong.leftY >= 51.99f && pong.leftY <= 188.01f && pong.rightY >= 51.99f &&
+                       pong.rightY <= 188.01f;
+    mouthInBounds &= mouthHeight(t) >= 4 && mouthHeight(t) <= 13;
+  }
+  CHECK(ballInBounds);
+  CHECK(paddlesInBounds);
+  CHECK(mouthInBounds);
   CHECK(!strcmp(visual("editing"), "running"));
+  CHECK(!strcmp(visual("tool"), "running"));
   CHECK(!strcmp(visual("speaking"), "thinking"));
+  CHECK(!strcmp(visual("searching"), "thinking"));
+  CHECK(!strcmp(visual("sleep"), "idle"));
+  CHECK(!strcmp(visual("sleepy"), "idle"));
 }
 
 static void protocolTests() {

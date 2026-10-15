@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>离线图标 · 三种候选</title
+  ><style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      background: #0c1420;
+      color: #e8eff5;
+      font:
+        16px/1.7 "Microsoft YaHei",
+        sans-serif;
+      margin: 0;
+    }
+    main {
+      max-width: 1160px;
+      margin: auto;
+      padding: 32px 24px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 8px;
+    }
+    p {
+      color: #9aafbf;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin: 28px 0;
+    }
+    figure {
+      margin: 0;
+      padding: 14px;
+      background: #142331;
+      border: 1px solid #2c4557;
+      border-radius: 16px;
+    }
+    img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4/3;
+      image-rendering: pixelated;
+      border-radius: 8px;
+    }
+    h2 {
+      font-size: 19px;
+      margin: 14px 0 4px;
+    }
+    .recommended {
+      border-color: #49d9ff;
+    }
+    figcaption p {
+      font-size: 14px;
+      margin: 0;
+    }
+    a {
+      color: #49d9ff;
+    }
+    @media (max-width: 800px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      figure {
+        max-width: 640px;
+      }
+    }
+  </style>
+  <main>
+    <h1>离线图标 · 三种候选</h1>
+    <p>
+      沿用深蓝底、青蓝发光点阵、4 px 间距。此页保留三种未采用的历史候选；最终采用<a
+        href="../offline-cross-eyes-preview.png"
+        >青蓝叉眼笑脸</a
+      >，见<a href="../willump-face-preview.html">当前七态预览</a>。
+    </p>
+    <div class="grid">
+      <figure>
+        <img src="01-broken-link-face.png" alt="方案一：方眼与断开的链环嘴" />
+        <figcaption>
+          <h2>01 · 断链表情</h2>
+          <p>方眼配合断开的链环嘴，保留机器人的脸部表情。</p>
+        </figcaption>
+      </figure>
+      <figure class="recommended">
+        <img src="02-wifi-disconnected.png" alt="方案二：带斜线的 Wi-Fi 断开图标" />
+        <figcaption>
+          <h2>02 · 无线断开</h2>
+          <p>整屏显示带斜线的 Wi-Fi 符号，直接表达网络连接中断。</p>
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="03-plug-socket-face.png" alt="方案三：插头眼、插座眼和断开的线缆嘴" />
+        <figcaption>
+          <h2>03 · 插头插座脸</h2>
+          <p>插头和插座化为双眼，下方断开的线缆作为嘴巴。</p>
+        </figcaption>
+      </figure>
+    </div>
+    <p>屏幕原始尺寸 320×240；图片为整数 2 倍放大，保持点阵形状。</p>
+    <p><a href="../willump-face-preview.html">返回当前七态预览</a></p>
+  </main>
+</html>

@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>威朗普 · 电子屏表情方案</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #0c1420;
+        color: #e8eff5;
+        font:
+          15px/1.7 "Microsoft YaHei",
+          sans-serif;
+      }
+      main {
+        max-width: 1160px;
+        margin: auto;
+        padding: 30px 28px 48px;
+      }
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 3px;
+        color: #6d9eb1;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.4;
+        margin: 9px 0;
+      }
+      p {
+        color: #9aafbf;
+        margin: 8px 0;
+      }
+      .intro {
+        max-width: 850px;
+      }
+      .stage {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 36px;
+        align-items: center;
+        padding: 26px;
+        background: #132232;
+        border: 1px solid #294355;
+        border-radius: 22px;
+        margin: 26px 0;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4/3;
+        background: #060e18;
+        image-rendering: pixelated;
+      }
+      .device {
+        padding: 12px;
+        background: #263542;
+        border-radius: 19px;
+        border: 1px solid #52616c;
+        box-shadow: 0 14px 24px #050c1480;
+      }
+      .device canvas {
+        border-radius: 9px;
+      }
+      h2 {
+        font-size: 23px;
+        margin: 0 0 6px;
+      }
+      .badge {
+        color: #49d9ff;
+        font-size: 12px;
+        letter-spacing: 2px;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        color: #d7e6ef;
+        background: #1c3041;
+        border: 1px solid #466173;
+        border-radius: 9px;
+        padding: 7px 14px;
+        margin: 12px 8px 0 0;
+      }
+      button:hover {
+        border-color: #49d9ff;
+      }
+      button:focus-visible,
+      .card:focus-visible {
+        outline: 2px solid #49d9ff;
+        outline-offset: 4px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      .card {
+        padding: 12px;
+        text-align: left;
+        background: #142331;
+        border: 1px solid #2c4557;
+        border-radius: 14px;
+        margin: 0;
+        min-width: 0;
+      }
+      .card[aria-pressed="true"] {
+        border-color: #49d9ff;
+        box-shadow: 0 0 0 1px #49d9ff40;
+      }
+      .card canvas {
+        border-radius: 7px;
+      }
+      .card strong {
+        display: block;
+        font-size: 16px;
+        margin-top: 10px;
+      }
+      .card span {
+        display: block;
+        color: #91a9ba;
+        font-size: 12px;
+        line-height: 1.6;
+        margin-top: 3px;
+      }
+      .notes {
+        padding: 18px 0;
+        border-top: 1px solid #294355;
+        margin-top: 28px;
+      }
+      .notes p {
+        font-size: 13px;
+      }
+      a {
+        color: #68dfff;
+      }
+      .timeline {
+        margin: 16px 0;
+        max-width: 340px;
+      }
+      .timeline label {
+        display: block;
+        font-size: 12px;
+        color: #9aafbf;
+      }
+      .timeline output {
+        float: right;
+      }
+      .timeline input {
+        width: 100%;
+        accent-color: #49d9ff;
+        cursor: pointer;
+      }
+      .small {
+        font-size: 12px;
+      }
+      @media (max-width: 850px) {
+        .stage {
+          grid-template-columns: 1fr;
+        }
+        .device {
+          max-width: 400px;
+        }
+        .grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        main {
+          padding: 24px 16px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">AGENT INDICATOR / WILLUMP FACE STUDY 03</div>
+      <h1>威朗普的电子屏脸</h1>
+      <p class="intro">
+        根据你整理的游戏截图重画：空闲与完成沿用现有笑脸；思考使用开合嘴动画，执行使用双板击球动画，等待与异常按参考图还原；离线改用已确认的叉眼笑脸。
+      </p>
+      <section class="stage">
+        <div class="device">
+          <canvas id="hero" width="320" height="240" aria-label="当前表情放大预览"></canvas>
+        </div>
+        <div>
+          <div class="badge">320 × 240 / LED PIXEL FACE</div>
+          <h2 id="title"></h2>
+          <p id="description"></p>
+          <button id="pause">暂停动画</button><button id="replay">重新播放</button>
+          <div class="timeline">
+            <label for="time">动画时间 <output id="time-label">0.00 s</output></label
+            ><input
+              id="time"
+              type="range"
+              min="0"
+              max="14"
+              step="0.01"
+              value="0"
+              aria-label="动画时间（秒）"
+            />
+          </div>
+          <p class="small">
+            点击下面任一表情切换放大预览。完成与异常的入场动作只播放一次，然后保持。
+          </p>
+        </div>
+      </section>
+      <div class="grid" id="grid"></div>
+      <div class="notes">
+        <p>
+          造型依据：thinking1.png /
+          thinking2.png、execute.png、waiting.png、error.png、用户确认的叉眼笑脸示意图。采用统一青蓝点阵，异常使用红色屏幕与橙红尖括号眼，离线使用青蓝叉眼和弧形笑嘴。空闲与完成的造型和动作保持原样。
+        </p>
+        <p>
+          点击各表情查看放大动画；暂停后可拖动时间轴，检查嘴部开合和球拍碰撞。本方案已移植到固件
+          2026.10.15-r1 并于 2026-10-15 烧录；实屏观感与联网回放待验收。
+        </p>
+        <p>
+          参考：<a
+            href="https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Nunu_4.jpg"
+            target="_blank"
+            rel="noreferrer"
+            >拳头官方皮肤原画</a
+          >
+          ·
+          <a
+            href="https://op.gg/zh-cn/lol/skins/Nunu/nunu_willump_bot"
+            target="_blank"
+            rel="noreferrer"
+            >皮肤名称与展示</a
+          >
+          · <a href="video-motion-review-v5.html">原银色方案</a>
+        </p>
+      </div>
+    </main>
+    <script>
+      const specs = {
+        idle: ["空闲 · 友好待命", "保持原样：浅弧眼与方块笑嘴，偶尔侧看、自然眨眼。"],
+        thinking: [
+          "思考 · 矩形嘴开合",
+          "参考 thinking1 / thinking2：短横眼保持不动，矩形空心嘴收合成实心横条，再张开，循环播放。",
+        ],
+        running: [
+          "执行 · 双板击球",
+          "参考 execute：左右竖板上下移动，一颗球在两板之间来回弹跳，碰到竖板后反向。",
+        ],
+        waiting: ["等待 · 方眼平嘴", "参考 waiting：青蓝方眼与细平嘴，保持正视，偶尔眨眼。"],
+        done: ["完成 · 招牌笑脸", "保持原样：更高的笑眼与宽嘴，左眼眨一下庆祝；之后保持笑脸。"],
+        error: [
+          "异常 · 挤眼警报",
+          "参考 error：红色屏幕、向内挤的尖括号眼与短横嘴；入场轻摇一次，然后保持。",
+        ],
+        offline: [
+          "离线 · 叉眼笑脸",
+          "青蓝叉眼与弧形笑嘴，固定显示；连接恢复后切回真实 Agent 状态。",
+        ],
+      };
+      let enlarged = true,
+        mode = "done",
+        selected = "done",
+        clock = 0,
+        last = 0;
+      let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const ease = (progress) => {
+        progress = Math.max(0, Math.min(1, progress));
+        return progress * progress * (3 - 2 * progress);
+      };
+      function track(elapsedSeconds, keys) {
+        elapsedSeconds %= keys.at(-1)[0];
+        for (let keyIndex = 1; keyIndex < keys.length; keyIndex++) {
+          if (elapsedSeconds <= keys[keyIndex][0]) {
+            const previousKey = keys[keyIndex - 1];
+            const nextKey = keys[keyIndex];
+            const segmentProgress = ease(
+              (elapsedSeconds - previousKey[0]) / (nextKey[0] - previousKey[0]),
+            );
+            return previousKey[1] + (nextKey[1] - previousKey[1]) * segmentProgress;
+          }
+        }
+        return keys[0][1];
+      }
+      function targetAt(elapsedSeconds) {
+        const targetPose = {
+          x: 0,
+          y: 0,
+          left: 43,
+          right: 43,
+          width: 19,
+          gap: 76,
+          happy: 0,
+          failed: 0,
+          work: 0,
+          thought: 0,
+          attention: 0,
+          amber: 0,
+        };
+        if (mode === "idle") {
+          targetPose.x = track(elapsedSeconds, [
+            [0, 0],
+            [1.8, 0],
+            [2.2, 8],
+            [3.4, 8],
+            [3.9, 0],
+            [7.2, 0],
+          ]);
+          targetPose.y = -2;
+        }
+        if (mode === "thinking") {
+          const look = track(elapsedSeconds, [
+            [0, 0],
+            [0.6, 1],
+            [2.4, 1],
+            [3, 0],
+            [3.5, 0],
+            [4.1, -1],
+            [5.9, -1],
+            [6.5, 0],
+            [8, 0],
+          ]);
+          targetPose.x = 12 * look;
+          targetPose.y = -3 - 10 * Math.abs(look);
+          targetPose.left = 39 + 6 * look;
+          targetPose.right = 39 - 6 * look;
+          targetPose.thought = 1;
+        }
+        if (mode === "running") {
+          const cycle = writingPhase(elapsedSeconds);
+          const side = Math.floor(elapsedSeconds / WRITE_PERIOD) % 2 === 0 ? -1 : 1;
+          targetPose.work = 1;
+          targetPose.gap = 70;
+          if (cycle < 2) {
+            targetPose.x = -10 + (20 * cycle) / 2;
+            targetPose.y = 10;
+            targetPose.right = 32;
+            targetPose.left = targetPose.right;
+          } else {
+            targetPose.x = track(cycle, [
+              [0, 10],
+              [2, 10],
+              [2.5, 0],
+              [2.95, side * 12],
+              [3.85, side * 12],
+              [4.5, 0],
+              [5.6, 0],
+            ]);
+            targetPose.y = track(cycle, [
+              [0, 10],
+              [2, 10],
+              [2.5, 0],
+              [2.95, -13],
+              [3.85, -13],
+              [4.5, 0],
+              [5.6, 0],
+            ]);
+            targetPose.right = 40;
+            targetPose.left = targetPose.right;
+          }
+        }
+        if (mode === "waiting") {
+          targetPose.x = track(elapsedSeconds, [
+            [0, 0],
+            [0.5, -16],
+            [1.5, -16],
+            [2.3, 16],
+            [3.3, 16],
+            [3.9, 0],
+            [4.8, 0],
+          ]);
+          targetPose.y = -2;
+          targetPose.right = 49;
+          targetPose.left = targetPose.right;
+          targetPose.width = 21;
+          targetPose.attention = 1;
+          targetPose.amber = 1;
+        }
+        if (mode === "done") {
+          targetPose.happy = 1;
+          targetPose.y = elapsedSeconds < 0.6 ? -4 * Math.sin((elapsedSeconds / 0.6) * Math.PI) : 0;
+        }
+        if (mode === "error") {
+          targetPose.failed = 1;
+          targetPose.x =
+            elapsedSeconds < 0.55
+              ? 4 * Math.sin((elapsedSeconds / 0.55) * Math.PI * 4) * (1 - elapsedSeconds / 0.55)
+              : 0;
+        }
+        {
+          // Both comparisons use v4 choreography
+          targetPose.width *= 1.3;
+          targetPose.left *= 1.3;
+          targetPose.right *= 1.3;
+          targetPose.gap *= 1.15;
+          if (mode === "thinking") {
+            const look = track(elapsedSeconds, [
+              [0, 0],
+              [0.45, 1],
+              [1.1, 1],
+              [1.3, 0.85],
+              [1.5, 1],
+              [2.4, 1],
+              [2.95, 0],
+              [3.5, 0],
+              [3.95, -1],
+              [4.6, -1],
+              [4.8, -0.85],
+              [5, -1],
+              [5.9, -1],
+              [6.45, 0],
+              [8, 0],
+            ]);
+            targetPose.x = 23 * look;
+            targetPose.y = -4 - 18 * Math.abs(look);
+            targetPose.left = (40 + 10 * look) * 1.3;
+            targetPose.right = (40 - 10 * look) * 1.3;
+          }
+          if (mode === "running") {
+            const cycle = writingPhase(elapsedSeconds);
+            const side = Math.floor(elapsedSeconds / WRITE_PERIOD) % 2 === 0 ? -1 : 1;
+            if (cycle < 2) {
+              const point = writtenPoint(cycle);
+              targetPose.x = (point.tip[0] - 156) * 0.95;
+              targetPose.y = 12 + (point.tip[1] - 178) * 0.7;
+              targetPose.right = 44;
+              targetPose.left = targetPose.right;
+              targetPose.gap = 82;
+            } else {
+              targetPose.x = track(cycle, [
+                [0, 24.7],
+                [2, 24.7],
+                [2.45, 0],
+                [2.9, side * 23],
+                [3.85, side * 23],
+                [4.45, 0],
+                [5.6, 0],
+              ]);
+              targetPose.y = track(cycle, [
+                [0, 12],
+                [2, 12],
+                [2.45, 0],
+                [2.9, -21],
+                [3.85, -21],
+                [4.45, 0],
+                [5.6, 0],
+              ]);
+              targetPose.right = 54;
+              targetPose.left = targetPose.right;
+            }
+          }
+        }
+        if (enlarged) {
+          targetPose.width *= 1.2;
+          targetPose.left *= 1.2;
+          targetPose.right *= 1.2;
+        }
+        if (mode === "offline") {
+          targetPose.right = 14 * (enlarged ? 1.2 : 1);
+          targetPose.left = targetPose.right;
+          targetPose.y = 5;
+        }
+        return targetPose;
+      }
+      const WRITE_PERIOD = 5.6 - 2 + 2 / 1.2;
+      function writingPhase(elapsedSeconds) {
+        const cycle = elapsedSeconds % WRITE_PERIOD;
+        return cycle < 2 / 1.2 ? cycle * 1.2 : cycle + 2 - 2 / 1.2;
+      }
+      function writtenPoint(cycle) {
+        const points = [
+          [130, 180],
+          [137, 177],
+          [141, 181],
+          [148, 176],
+          [154, 180],
+          [160, 176],
+          [166, 179],
+          [174, 177],
+          [182, 179],
+        ];
+        const progress = Math.min(1, cycle / 2) * (points.length - 1);
+        const pointIndex = Math.min(points.length - 2, Math.floor(progress));
+        const segmentProgress = progress - pointIndex;
+        const tip = [
+          points[pointIndex][0] +
+            (points[pointIndex + 1][0] - points[pointIndex][0]) * segmentProgress,
+          points[pointIndex][1] +
+            (points[pointIndex + 1][1] - points[pointIndex][1]) * segmentProgress,
+        ];
+        return {
+          tip,
+          d:
+            "M" +
+            points
+              .slice(0, pointIndex + 1)
+              .map((point) => point.join(" "))
+              .join(" L") +
+            " L" +
+            tip.join(" "),
+        };
+      }
+
+      const BG = 0x060e18,
+        INK = 0x49d9ff,
+        WAITING = 0xe89820,
+        ERROR = 0xe34c60,
+        OFFLINE = 0x526777;
+      const blend = (a, b, t) => {
+        t = Math.max(0, Math.min(1, t));
+        let result = 0;
+        for (let s = 0; s <= 16; s += 8)
+          result |= Math.round(((a >> s) & 255) + (((b >> s) & 255) - ((a >> s) & 255)) * t) << s;
+        return result;
+      };
+      const css = (c) => "#" + c.toString(16).padStart(6, "0");
+      const round = (x) => (x < 0 ? -Math.round(-x) : Math.round(x));
+      function renderOriginal(canvas, p, t, state) {
+        const c = canvas.getContext("2d");
+        c.fillStyle = css(BG);
+        c.fillRect(0, 0, 320, 240);
+        function pixel(x, y, color) {
+          c.fillStyle = css(blend(BG, color, 0.18));
+          c.fillRect(x * 4 - 1, y * 4 - 1, 5, 5);
+          c.fillStyle = css(color);
+          c.fillRect(x * 4, y * 4, 3, 3);
+        }
+        function line(x0, y0, x1, y1, color) {
+          const dx = Math.abs(x1 - x0),
+            sx = x0 < x1 ? 1 : -1,
+            dy = -Math.abs(y1 - y0),
+            sy = y0 < y1 ? 1 : -1;
+          let error = dx + dy;
+          for (;;) {
+            pixel(x0, y0, color);
+            if (x0 === x1 && y0 === y1) break;
+            const e2 = error * 2;
+            if (e2 >= dy) {
+              error += dy;
+              x0 += sx;
+            }
+            if (e2 <= dx) {
+              error += dx;
+              y0 += sy;
+            }
+          }
+        }
+        function eye(x, y, lift, color) {
+          const peak = round(lift);
+          for (let row = 0; row < 2; row++) {
+            line(x - 6, y + row, x - 2, y - peak + row, color);
+            line(x - 2, y - peak + row, x + 2, y - peak + row, color);
+            line(x + 2, y - peak + row, x + 6, y + row, color);
+          }
+        }
+        function smile(dx, dy, color) {
+          for (let row = 0; row < 3; row++) {
+            line(24 + dx, 36 + dy + row, 27 + dx, 41 + dy + row, color);
+            line(27 + dx, 41 + dy + row, 53 + dx, 41 + dy + row, color);
+            line(53 + dx, 41 + dy + row, 56 + dx, 36 + dy + row, color);
+            line(21 + dx, 34 + dy + row, 23 + dx, 34 + dy + row, color);
+            line(57 + dx, 34 + dy + row, 59 + dx, 34 + dy + row, color);
+          }
+        }
+        function mouth(dx, dy, color) {
+          dx = Math.trunc(dx / 2);
+          dy = Math.trunc(dy / 2);
+          if (state === "waiting") {
+            line(37 + dx, 36 + dy, 43 + dx, 36 + dy, color);
+            line(37 + dx, 36 + dy, 37 + dx, 42 + dy, color);
+            line(43 + dx, 36 + dy, 43 + dx, 42 + dy, color);
+            line(37 + dx, 42 + dy, 43 + dx, 42 + dy, color);
+          } else if (state === "thinking") {
+            line(34 + dx, 39 + dy, 43 + dx, 39 + dy, color);
+            line(43 + dx, 39 + dy, 46 + dx, 37 + dy, color);
+          } else if (state === "running") {
+            const active = Math.floor(t * 3) % 5;
+            for (let i = 0; i < 5; i++)
+              line(
+                30 + i * 4 + dx,
+                39 + dy,
+                32 + i * 4 + dx,
+                39 + dy,
+                blend(BG, color, i === active ? 1 : 0.35),
+              );
+          } else smile(dx, dy, color);
+        }
+        if (state === "offline") {
+          line(23, 25, 32, 25, OFFLINE);
+          line(48, 25, 57, 25, OFFLINE);
+          line(29, 40, 37, 40, OFFLINE);
+          line(43, 40, 51, 40, OFFLINE);
+          pixel(39, 40, blend(BG, OFFLINE, 0.25 + 0.35 * (1 + Math.sin(t * 2))));
+        } else {
+          const color = blend(INK, WAITING, p.amber),
+            phase = t % 5.7;
+          const blink =
+            state !== "done" && state !== "error" && phase > 5.2 && phase < 5.38
+              ? Math.abs((phase - 5.29) / 0.09)
+              : 1;
+          const normal = Math.max(0, 1 - p.happy - p.failed),
+            dx = round(p.x / 4),
+            dy = round(p.y / 8);
+          if (normal > 0.01) {
+            const col = blend(BG, color, normal);
+            eye(28 + dx, 24 + dy, (2 + (p.left - 50) / 16) * blink, col);
+            eye(52 + dx, 24 + dy, (2 + (p.right - 50) / 16) * blink, col);
+            mouth(dx, dy, blend(BG, color, normal));
+          }
+          if (p.happy > 0.01) {
+            const col = blend(BG, INK, p.happy),
+              wink = t >= 0.85 && t <= 1.13 ? Math.sin(((t - 0.85) / 0.28) * Math.PI) : 0;
+            eye(28, 24 + dy, 5 * (1 - wink), col);
+            eye(52, 24 + dy, 5, col);
+            smile(0, dy, col);
+          }
+          if (p.failed > 0.01) {
+            const col = blend(BG, ERROR, p.failed);
+            for (const x of [28, 52]) {
+              line(x - 4 + dx, 21, x + 4 + dx, 29, col);
+              line(x + 4 + dx, 21, x - 4 + dx, 29, col);
+            }
+            line(28 + dx, 41, 33 + dx, 38, col);
+            line(33 + dx, 38, 40 + dx, 41, col);
+            line(40 + dx, 41, 47 + dx, 38, col);
+            line(47 + dx, 38, 52 + dx, 41, col);
+          }
+          if (p.thought > 0.01) {
+            const col = blend(BG, INK, p.thought * 0.7);
+            pixel(p.x < 0 ? 12 : 68, 12, col);
+            pixel(p.x < 0 ? 9 : 71, 9, col);
+          }
+          if (p.attention > 0.01)
+            pixel(
+              40,
+              51,
+              blend(
+                BG,
+                WAITING,
+                p.attention * (0.3 + (0.7 * (1 - Math.cos((t * 2 * Math.PI) / 3.6))) / 2),
+              ),
+            );
+        }
+        c.fillStyle = css(state === "offline" ? 0x303944 : 0x397080);
+        c.beginPath();
+        c.arc(160, 220, 2, 0, 2 * Math.PI);
+        c.fill();
+      }
+
+      const THINK_PERIOD = 2.4;
+      function mouthOpening(t) {
+        return track(t, [
+          [0, 1],
+          [0.55, 1],
+          [0.9, 0],
+          [1.5, 0],
+          [1.85, 1],
+          [THINK_PERIOD, 1],
+        ]);
+      }
+      const FLIGHT_SECONDS = 1.4;
+      function reflected(value, span) {
+        const phase = ((value % (span * 2)) + span * 2) % (span * 2);
+        return phase < span ? phase : span * 2 - phase;
+      }
+      function ballY(t) {
+        return 52 + reflected(48 + t * 58, 136);
+      }
+      function paddleY(t, firstHit) {
+        const period = FLIGHT_SECONDS * 2;
+        const previousHit = firstHit + Math.floor((t - firstHit) / period) * period;
+        const progress = ease((t - previousHit) / period);
+        return ballY(previousHit) + (ballY(previousHit + period) - ballY(previousHit)) * progress;
+      }
+      function pongAt(t) {
+        return {
+          x: 76 + reflected(t / FLIGHT_SECONDS, 1) * 164,
+          y: ballY(t),
+          leftY: paddleY(t, 0),
+          rightY: paddleY(t, FLIGHT_SECONDS),
+        };
+      }
+      function render(canvas, p, t, state) {
+        if (state === "idle" || state === "done") {
+          renderOriginal(canvas, p, t, state);
+          return;
+        }
+        const c = canvas.getContext("2d");
+        const background = state === "error" ? 0x230913 : BG;
+        c.fillStyle = css(background);
+        c.fillRect(0, 0, 320, 240);
+        // Same 4px LED pitch as the approved smile faces.
+        function pixel(x, y, color) {
+          c.fillStyle = css(blend(background, color, 0.18));
+          c.fillRect(x * 4 - 1, y * 4 - 1, 5, 5);
+          c.fillStyle = css(color);
+          c.fillRect(x * 4, y * 4, 3, 3);
+        }
+        function rect(x, y, w, h, color) {
+          for (let row = 0; row < h; row++)
+            for (let col = 0; col < w; col++) pixel(x + col, y + row, color);
+        }
+        function line(x0, y0, x1, y1, color, thickness = 2) {
+          const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+          for (let i = 0; i <= steps; i++) {
+            const f = steps ? i / steps : 0;
+            rect(round(x0 + (x1 - x0) * f), round(y0 + (y1 - y0) * f), thickness, thickness, color);
+          }
+        }
+        if (state === "thinking") {
+          rect(24, 21, 5, 2, INK);
+          rect(51, 21, 5, 2, INK);
+          const height = 4 + round(9 * mouthOpening(t)),
+            top = 36 - Math.floor(height / 2);
+          rect(21, top, 38, 2, INK);
+          rect(21, top + height - 2, 38, 2, INK);
+          rect(21, top, 2, height, INK);
+          rect(57, top, 2, height, INK);
+        } else if (state === "running") {
+          const pong = pongAt(t);
+          rect(16, round((pong.leftY - 24) / 4), 2, 12, INK);
+          rect(62, round((pong.rightY - 24) / 4), 2, 12, INK);
+          const bx = round(pong.x / 4),
+            by = round(pong.y / 4);
+          // Small round LED ball; no extra eyes or mouth.
+          rect(bx, by - 1, 1, 3, INK);
+          rect(bx - 1, by, 3, 1, INK);
+        } else if (state === "waiting") {
+          const phase = t % 6.8;
+          const openness = phase > 6.2 && phase < 6.38 ? Math.abs((phase - 6.29) / 0.09) : 1;
+          const height = Math.max(1, round(8 * openness));
+          rect(24, 25 - Math.floor(height / 2), 8, height, INK);
+          rect(48, 25 - Math.floor(height / 2), 8, height, INK);
+          rect(29, 41, 22, 2, INK);
+        } else if (state === "error") {
+          const dx =
+            t < 0.55 ? round((4 * Math.sin((t / 0.55) * Math.PI * 4) * (1 - t / 0.55)) / 4) : 0;
+          const color = 0xff775c;
+          line(23 + dx, 21, 28 + dx, 26, color);
+          line(28 + dx, 26, 23 + dx, 31, color);
+          line(55 + dx, 21, 50 + dx, 26, color);
+          line(50 + dx, 26, 55 + dx, 31, color);
+          rect(35 + dx, 41, 10, 2, 0xffa174);
+        } else if (state === "offline") {
+          for (const center of [28, 52]) {
+            line(center - 4, 19, center + 4, 27, INK);
+            line(center + 4, 19, center - 4, 27, INK);
+          }
+          const mouth = [
+            [26, 37],
+            [29, 40],
+            [34, 42],
+            [40, 43],
+            [46, 42],
+            [51, 40],
+            [54, 37],
+          ];
+          for (let index = 1; index < mouth.length; index++) {
+            line(...mouth[index - 1], ...mouth[index], INK);
+          }
+        }
+        c.fillStyle = css(state === "offline" ? 0x303944 : 0x397080);
+        c.beginPath();
+        c.arc(160, 220, 2, 0, 2 * Math.PI);
+        c.fill();
+      }
+
+      const cards = {},
+        poses = {};
+      for (const state of Object.keys(specs)) {
+        const b = document.createElement("button");
+        b.className = "card";
+        b.dataset.state = state;
+        b.innerHTML =
+          '<canvas width="320" height="240" aria-label="' +
+          specs[state][0] +
+          '"></canvas><strong>' +
+          specs[state][0] +
+          "</strong><span>" +
+          specs[state][1] +
+          "</span>";
+        b.onclick = () => select(state);
+        document.getElementById("grid").append(b);
+        cards[state] = b;
+        mode = state;
+        poses[state] = targetAt(0);
+      }
+      function draw(dt, snap = false) {
+        for (const state of Object.keys(specs)) {
+          mode = state;
+          const target = targetAt(clock),
+            p = poses[state],
+            s = snap ? 1 : 1 - Math.exp(-dt * 12);
+          for (const key in p) p[key] += (target[key] - p[key]) * s;
+          render(cards[state].querySelector("canvas"), p, clock, state);
+        }
+        render(document.getElementById("hero"), poses[selected], clock, selected);
+        document.getElementById("time").value = Math.min(clock, 14);
+        document.getElementById("time-label").textContent = clock.toFixed(2) + " s";
+      }
+      function select(state) {
+        selected = state;
+        clock = 0;
+        last = 0;
+        document.getElementById("title").textContent = specs[state][0];
+        document.getElementById("description").textContent = specs[state][1];
+        for (const key in cards)
+          cards[key].setAttribute("aria-pressed", key === state ? "true" : "false");
+        draw(0, true);
+      }
+      function label() {
+        document.getElementById("pause").textContent = paused ? "播放动画" : "暂停动画";
+      }
+      document.getElementById("pause").onclick = () => {
+        paused = !paused;
+        label();
+      };
+      document.getElementById("replay").onclick = () => select(selected);
+      document.getElementById("time").oninput = (event) => {
+        paused = true;
+        clock = Number(event.target.value);
+        last = 0;
+        label();
+        draw(0, true);
+      };
+      select(selected);
+      label();
+      function frame(ts) {
+        const dt = last ? Math.min((ts - last) / 1000, 0.05) : 0;
+        last = ts;
+        if (!paused) clock += dt;
+        draw(dt);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>

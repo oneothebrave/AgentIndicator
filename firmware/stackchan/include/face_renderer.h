@@ -4,7 +4,7 @@
 #include <string.h>
 #include "face_motion.h"
 
-// Canonical design: docs/design/expression-design.md and video-motion-review-v5.html.
+// Canonical design: docs/design/willump-face-preview.html (study 03).
 class FaceRenderer {
  public:
   bool begin() {
@@ -16,7 +16,7 @@ class FaceRenderer {
       canvas.setPsram(false);
       ready = canvas.createSprite(320, 240) != nullptr;
     }
-    Serial.printf("face design=motion-eyes-v5-silver framebuffer=%d\n", ready);
+    Serial.printf("face design=%s framebuffer=%d\n", FaceMotion::DESIGN, ready);
     return ready;
   }
 
@@ -26,248 +26,199 @@ class FaceRenderer {
 
   void update(uint32_t now, bool connected, const char* state, bool visible,
               bool restartAnimation = false) {
-    const char* next = connected ? visual(state) : "offline";
+    const char* next = connected ? FaceMotion::visual(state) : "offline";
     if (strcmp(next, current) || restartAnimation) {
       current = next;
       changedAt = now;
+      pose = FaceMotion::target(current, 0);
       Serial.printf("face state=%s\n", current);
     }
     if (!ready || !visible || now - lastFrame < 33) {
       return;
     }
-    const float deltaSeconds = lastFrame ? fminf((now - lastFrame) / 1000.f, .05f) : .033f;
+    const float dt = lastFrame ? fminf((now - lastFrame) / 1000.f, .05f) : .033f;
     lastFrame = now;
     const float elapsedSeconds = (now - changedAt) / 1000.f;
-    Pose targetPose = target(elapsedSeconds);
-    const float smoothing = 1 - expf(-deltaSeconds * 12);
-    smooth(pose.x, targetPose.x, smoothing);
-    smooth(pose.y, targetPose.y, smoothing);
-    smooth(pose.left, targetPose.left, smoothing);
-    smooth(pose.right, targetPose.right, smoothing);
-    smooth(pose.width, targetPose.width, smoothing);
-    smooth(pose.gap, targetPose.gap, smoothing);
-    smooth(pose.happy, targetPose.happy, smoothing);
-    smooth(pose.failed, targetPose.failed, smoothing);
-    smooth(pose.work, targetPose.work, smoothing);
-    smooth(pose.thought, targetPose.thought, smoothing);
-    smooth(pose.attention, targetPose.attention, smoothing);
-    smooth(pose.amber, targetPose.amber, smoothing);
-    canvas.fillScreen(rgb(BG));
-    if (is("offline")) {
-      offline(elapsedSeconds);
-      canvas.pushSprite(0, 0);
-      return;
+    const auto target = FaceMotion::target(current, elapsedSeconds);
+    const float smoothing = 1 - expf(-dt * 12);
+    smooth(pose.x, target.x, smoothing);
+    smooth(pose.y, target.y, smoothing);
+    background = is("error") ? FaceMotion::ERROR_BG : FaceMotion::BG;
+    canvas.fillScreen(rgb(background));
+    if (is("idle") || is("done")) {
+      smileFace(elapsedSeconds);
+    } else if (is("thinking")) {
+      thinking(elapsedSeconds);
+    } else if (is("running")) {
+      running(elapsedSeconds);
+    } else if (is("waiting")) {
+      waiting(elapsedSeconds);
+    } else if (is("error")) {
+      error(elapsedSeconds);
+    } else {
+      offline();
     }
-    const uint32_t eyeColor = blend(INK, FaceMotion::WAITING, pose.amber);
-    float blink = 1;
-    float phase = fmodf(elapsedSeconds, 5.7f);
-    if (!is("done") && !is("error") && phase > 5.2f && phase < 5.38f) {
-      blink = fabsf((phase - 5.29f) / .09f);
-    }
-    const float normal = fmaxf(0, 1 - pose.happy - pose.failed);
-    if (normal > .01f) {
-      for (int side = 0; side < 2; side++) {
-        const float height = fmaxf(4, (side ? pose.right : pose.left) * blink);
-        canvas.fillRoundRect(
-            lroundf(160 + (side ? 1 : -1) * pose.gap / 2 + pose.x - pose.width / 2),
-            lroundf(103 + pose.y - height / 2), lroundf(pose.width), lroundf(height),
-            lroundf(fminf(height, pose.width) / 2), rgb(blend(BG, eyeColor, normal)));
-      }
-    }
-    const float wink = is("done") ? FaceMotion::wink(elapsedSeconds) : 0;
-    if (pose.happy > .01f) {
-      for (int side = 0; side < 2; side++) {
-        const float x = 160 + (side ? 43.7f : -43.7f);
-        curve(x - 22.5f, x + 22.5f, 108 + pose.y, -45.f + 45.f * (side ? 0 : wink),
-              rgb(blend(BG, INK, pose.happy)), 4);
-      }
-    }
-    if (pose.failed > .01f) {
-      for (int side = 0; side < 2; side++) {
-        float x = side ? 217.f : 103.f;
-        const auto color = rgb(blend(BG, FaceMotion::ERROR, pose.failed));
-        stroke(x - 16.5f + pose.x, 86.5f, x + 16.5f + pose.x, 119.5f, color, 4);
-        stroke(x + 16.5f + pose.x, 86.5f, x - 16.5f + pose.x, 119.5f, color, 4);
-      }
-    }
-    if (pose.thought > .01f) {
-      const auto color =
-          rgb(blend(BG, INK, pose.thought * (.35f + .65f * fminf(1, fabsf(pose.x) / 12))));
-      // Mirror around screen center, preserving the upward outward direction.
-      canvas.fillCircle(pose.x < 0 ? 54 : 266, 37, 2, color);
-      canvas.fillCircle(pose.x < 0 ? 43 : 277, 27, 3, color);
-    }
-    if (pose.attention > .01f) {
-      canvas.fillCircle(
-          160, 174, 3,
-          rgb(blend(
-              BG, FaceMotion::WAITING,
-              pose.attention * (.35f + .65f * (1 - cosf(elapsedSeconds * 2 * PI / 3.6f)) / 2))));
-    }
-    if (pose.work > .01f) {
-      writing(elapsedSeconds);
-    }
-    if (connected) {
-      canvas.fillCircle(160, 220, 2, rgb(0x718080));
-    }
+    canvas.fillCircle(160, 220, 2, rgb(connected ? 0x397080 : 0x303944));
     canvas.pushSprite(0, 0);
   }
 
  private:
-  static constexpr uint32_t BG = FaceMotion::BG;
   static constexpr uint32_t INK = FaceMotion::INK;
-  using Pose = FaceMotion::Pose;
   M5Canvas canvas{&M5.Display};
-  Pose pose;
+  FaceMotion::Pose pose;
   bool ready = false;
   const char* current = "offline";
   uint32_t changedAt = 0;
   uint32_t lastFrame = 0;
+  uint32_t background = FaceMotion::BG;
 
   bool is(const char* state) const {
     return !strcmp(current, state);
   }
 
-  static const char* visual(const char* state) {
-    return FaceMotion::visual(state);
+  static void smooth(float& value, float target, float smoothing) {
+    value += (target - value) * smoothing;
   }
 
-  static float ease(float progress) {
-    return FaceMotion::ease(progress);
-  }
-
-  static float writingPhase(float elapsedSeconds) {
-    return FaceMotion::writingPhase(elapsedSeconds);
-  }
-
-  static void smooth(float& value, float targetPose, float smoothing) {
-    value += (targetPose - value) * smoothing;
-  }
-
-  Pose target(float elapsedSeconds) {
-    return FaceMotion::target(current, elapsedSeconds);
-  }
-
-  static uint32_t blend(uint32_t fromColor, uint32_t toColor, float progress) {
+  static uint32_t blend(uint32_t from, uint32_t to, float progress) {
     progress = fmaxf(0, fminf(1, progress));
-    uint32_t value = 0;
+    uint32_t result = 0;
     for (int shift = 0; shift <= 16; shift += 8) {
-      float startChannel = (fromColor >> shift) & 255;
-      float endChannel = (toColor >> shift) & 255;
-      value |= (uint32_t)lroundf(startChannel + (endChannel - startChannel) * progress) << shift;
+      const float start = (from >> shift) & 255;
+      result |= (uint32_t)lroundf(start + (((to >> shift) & 255) - start) * progress) << shift;
     }
-    return value;
+    return result;
   }
 
   uint16_t rgb(uint32_t color) {
     return canvas.color565(color >> 16, (color >> 8) & 255, color & 255);
   }
 
-  void stroke(float startX, float startY, float endX, float endY, uint16_t color, int radius) {
-    int stepCount = (int)fmaxf(fabsf(endX - startX), fabsf(endY - startY)) + 1;
-    for (int index = 0; index <= stepCount; index++) {
-      float progress = (float)index / stepCount;
-      canvas.fillCircle(lroundf(startX + (endX - startX) * progress),
-                        lroundf(startY + (endY - startY) * progress), radius, color);
+  // 4px LED pitch, 3px cores and a dim surround; no texture or blur buffer.
+  void pixel(int x, int y, uint32_t color) {
+    canvas.fillRect(x * 4 - 1, y * 4 - 1, 5, 5, rgb(blend(background, color, .18f)));
+    canvas.fillRect(x * 4, y * 4, 3, 3, rgb(color));
+  }
+
+  void rect(int x, int y, int width, int height, uint32_t color) {
+    for (int row = 0; row < height; row++) {
+      for (int column = 0; column < width; column++) {
+        pixel(x + column, y + row, color);
+      }
     }
   }
 
-  void curve(float left, float right, float y, float bend, uint16_t color, int radius) {
-    float previousX = left;
-    float previousY = y;
-    for (int index = 1; index <= 24; index++) {
-      float progress = index / 24.f;
-      float x = left + (right - left) * progress;
-      float currentY = y + 2 * bend * progress * (1 - progress);
-      stroke(previousX, previousY, x, currentY, color, radius);
-      previousX = x;
-      previousY = currentY;
-    }
-  }
-
-  static const float (&writingPoints())[9][2] {
-    return FaceMotion::writingPoints();
-  }
-
-  static void writtenPoint(float cycle, float& x, float& y) {
-    FaceMotion::writtenPoint(cycle, x, y);
-  }
-
-  void offline(float elapsedSeconds) {
-    const auto eye = rgb(FaceMotion::OFFLINE);
-    canvas.fillRoundRect(102, 78, 29, 58, 14, eye);
-    canvas.fillRoundRect(189, 78, 29, 58, 14, eye);
-    stroke(129, 95, 141, 95, eye, 2);
-    stroke(129, 119, 141, 119, eye, 2);
-    stroke(199, 97, 199, 103, rgb(BG), 2);
-    stroke(208, 111, 208, 117, rgb(BG), 2);
-    const float points[][2] = {{120, 177}, {140, 177}, {148, 172}, {155, 184},
-                               {163, 163}, {171, 181}, {178, 177}, {200, 177}};
-    float lengths[7];
-    float total = 0;
-    const float alpha = .4f + .6f * (1 - cosf(elapsedSeconds * 2 * PI / 3.2f)) / 2;
-    const auto line = rgb(blend(BG, FaceMotion::OFFLINE, alpha));
-    for (int index = 0; index < 7; index++) {
-      lengths[index] =
-          hypotf(points[index + 1][0] - points[index][0], points[index + 1][1] - points[index][1]);
-      total += lengths[index];
-      stroke(points[index][0], points[index][1], points[index + 1][0], points[index + 1][1], line,
-             1);
-    }
-    float distance = fmodf(elapsedSeconds, 3.2f) / 3.2f * total;
-    for (int index = 0; index < 7; index++) {
-      if (distance <= lengths[index]) {
-        float progress = distance / lengths[index];
-        canvas.fillCircle(
-            lroundf(points[index][0] + progress * (points[index + 1][0] - points[index][0])),
-            lroundf(points[index][1] + progress * (points[index + 1][1] - points[index][1])), 3,
-            rgb(blend(BG, 0xb0b0b0, alpha)));
+  void line(int x0, int y0, int x1, int y1, uint32_t color) {
+    const int dx = abs(x1 - x0);
+    const int sx = x0 < x1 ? 1 : -1;
+    const int dy = -abs(y1 - y0);
+    const int sy = y0 < y1 ? 1 : -1;
+    int error = dx + dy;
+    for (;;) {
+      pixel(x0, y0, color);
+      if (x0 == x1 && y0 == y1) {
         break;
       }
-      distance -= lengths[index];
+      const int twice = error * 2;
+      if (twice >= dy) {
+        error += dy;
+        x0 += sx;
+      }
+      if (twice <= dx) {
+        error += dx;
+        y0 += sy;
+      }
     }
   }
 
-  void writing(float elapsedSeconds) {
-    const float cycle = writingPhase(elapsedSeconds);
-    const auto& points = writingPoints();
-    float progress = fminf(1, cycle / 2) * 8;
-    int index = (int)fminf(7, floorf(progress));
-    float x;
-    float y;
-    writtenPoint(cycle, x, y);
-    float alpha = pose.work * (1 - ease((cycle - 2.1f) / .3f));
-    if (alpha > .01f && cycle > 0) {
-      auto color = rgb(blend(BG, INK, alpha));
-      for (int index = 0; index < index; index++) {
-        stroke(points[index][0], points[index][1], points[index + 1][0], points[index + 1][1],
-               color, 1);
-      }
-      stroke(points[index][0], points[index][1], x, y, color, 1);
+  void thickLine(int x0, int y0, int x1, int y1, uint32_t color) {
+    const int steps = (int)fmaxf(abs(x1 - x0), abs(y1 - y0));
+    for (int index = 0; index <= steps; index++) {
+      const float progress = steps ? (float)index / steps : 0;
+      rect(lroundf(x0 + (x1 - x0) * progress), lroundf(y0 + (y1 - y0) * progress), 2, 2, color);
     }
-    float penOpacity = 1;
-    if (cycle >= 2) {
-      y -= 8 * ease((cycle - 2) / .3f);
-      penOpacity = 1 - ease((cycle - 2.1f) / .3f);
+  }
+
+  void eye(int x, int y, float lift) {
+    const int peak = lroundf(lift);
+    for (int row = 0; row < 2; row++) {
+      line(x - 6, y + row, x - 2, y - peak + row, INK);
+      line(x - 2, y - peak + row, x + 2, y - peak + row, INK);
+      line(x + 2, y - peak + row, x + 6, y + row, INK);
     }
-    if (cycle >= 4.8f) {
-      x = 130;
-      y = 180 - 8 * (1 - ease((cycle - 4.8f) / .6f));
-      penOpacity = ease((cycle - 4.8f) / .6f);
+  }
+
+  void smile(int dx, int dy) {
+    for (int row = 0; row < 3; row++) {
+      line(24 + dx, 36 + dy + row, 27 + dx, 41 + dy + row, INK);
+      line(27 + dx, 41 + dy + row, 53 + dx, 41 + dy + row, INK);
+      line(53 + dx, 41 + dy + row, 56 + dx, 36 + dy + row, INK);
+      line(21 + dx, 34 + dy + row, 23 + dx, 34 + dy + row, INK);
+      line(57 + dx, 34 + dy + row, 59 + dx, 34 + dy + row, INK);
     }
-    alpha = pose.work * penOpacity;
-    if (alpha < .01f) {
-      return;
+  }
+
+  void smileFace(float elapsedSeconds) {
+    const int dx = lroundf(pose.x / 4);
+    const int dy = lroundf(pose.y / 8);
+    if (is("done")) {
+      eye(28, 24 + dy, 5 * (1 - FaceMotion::wink(elapsedSeconds)));
+      eye(52, 24 + dy, 5);
+      smile(0, dy);
+    } else {
+      const float blink = FaceMotion::blink(elapsedSeconds);
+      eye(28 + dx, 24 + dy, (2 + (pose.left - 50) / 16) * blink);
+      eye(52 + dx, 24 + dy, (2 + (pose.right - 50) / 16) * blink);
+      smile(dx / 2, dy / 2);
     }
-    auto color = rgb(blend(BG, INK, alpha));
-    canvas.fillTriangle(x + 3.45f, y - 11.5f, x + 17.25f, y - 33.35f, x + 25.3f, y - 26.45f, color);
-    canvas.fillTriangle(x + 3.45f, y - 11.5f, x + 25.3f, y - 26.45f, x + 11.5f, y - 5.75f, color);
-    stroke(x + 19.55f, y - 33.35f, x + 24.15f, y - 29.9f, color, 3);
-    canvas.fillTriangle(x, y, x + 3.45f, y - 11.5f, x + 11.5f, y - 5.75f,
-                        rgb(blend(BG, 0xf0e7dc, alpha)));
-    canvas.fillTriangle(x, y, x + 2.3f, y - 5.75f, x + 5.75f, y - 2.3f,
-                        rgb(blend(BG, 0x8d7dac, alpha)));
-    stroke(x + 16.1f, y - 31.05f, x + 24.15f, y - 25.3f, rgb(blend(BG, 0x827494, alpha)), 1);
-    stroke(x + 6.9f, y - 13.8f, x + 18.4f, y - 29.9f, rgb(blend(BG, 0xf5efff, alpha)), 1);
+  }
+
+  void thinking(float elapsedSeconds) {
+    rect(24, 21, 5, 2, INK);
+    rect(51, 21, 5, 2, INK);
+    const int height = FaceMotion::mouthHeight(elapsedSeconds);
+    const int top = 36 - height / 2;
+    rect(21, top, 38, 2, INK);
+    rect(21, top + height - 2, 38, 2, INK);
+    rect(21, top, 2, height, INK);
+    rect(57, top, 2, height, INK);
+  }
+
+  void running(float elapsedSeconds) {
+    const auto pong = FaceMotion::pongAt(elapsedSeconds);
+    rect(16, lroundf((pong.leftY - 24) / 4), 2, 12, INK);
+    rect(62, lroundf((pong.rightY - 24) / 4), 2, 12, INK);
+    const int x = lroundf(pong.x / 4);
+    const int y = lroundf(pong.y / 4);
+    rect(x, y - 1, 1, 3, INK);
+    rect(x - 1, y, 3, 1, INK);
+  }
+
+  void waiting(float elapsedSeconds) {
+    const int height = (int)fmaxf(1, lroundf(8 * FaceMotion::blink(elapsedSeconds, 6.8f, 6.29f)));
+    rect(24, 25 - height / 2, 8, height, INK);
+    rect(48, 25 - height / 2, 8, height, INK);
+    rect(29, 41, 22, 2, INK);
+  }
+
+  void error(float elapsedSeconds) {
+    const int dx = FaceMotion::errorOffset(elapsedSeconds);
+    thickLine(23 + dx, 21, 28 + dx, 26, FaceMotion::ERROR);
+    thickLine(28 + dx, 26, 23 + dx, 31, FaceMotion::ERROR);
+    thickLine(55 + dx, 21, 50 + dx, 26, FaceMotion::ERROR);
+    thickLine(50 + dx, 26, 55 + dx, 31, FaceMotion::ERROR);
+    rect(35 + dx, 41, 10, 2, FaceMotion::ERROR_MOUTH);
+  }
+
+  void offline() {
+    for (const int center : {28, 52}) {
+      thickLine(center - 4, 19, center + 4, 27, FaceMotion::OFFLINE);
+      thickLine(center + 4, 19, center - 4, 27, FaceMotion::OFFLINE);
+    }
+    const int mouth[][2] = {{26, 37}, {29, 40}, {34, 42}, {40, 43}, {46, 42}, {51, 40}, {54, 37}};
+    for (int index = 1; index < 7; index++) {
+      thickLine(mouth[index - 1][0], mouth[index - 1][1], mouth[index][0], mouth[index][1],
+                FaceMotion::OFFLINE);
+    }
   }
 };

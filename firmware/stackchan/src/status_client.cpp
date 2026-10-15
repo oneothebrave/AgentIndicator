@@ -181,9 +181,9 @@ void setup() {
   config.internal_mic = false;
   config.internal_spk = false;
   M5.begin(config);
-  Serial.printf("firmware version=%s design=motion-eyes-v5-silver rise=20deg\n",
-                INDICATOR_FIRMWARE_VERSION);
   Serial.begin(115200);
+  Serial.printf("firmware version=%s design=%s rise=20deg\n", INDICATOR_FIRMWARE_VERSION,
+                FaceMotion::DESIGN);
   M5.Display.setRotation(1);
   M5.Display.setBrightness(100);
   if (!face.begin()) {
